@@ -1,0 +1,24 @@
+{
+  "name": "farol-rmm-servidor",
+  "version": "0.1.0",
+  "description": "Servidor do Farol RMM: API, painel web e WebSocket",
+  "type": "module",
+  "private": true,
+  "license": "MIT",
+  "author": "Eduardo Lorenzo",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "start": "node src/servidor.js",
+    "criar-admin": "node scripts/criar-admin.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@fastify/helmet": "^13.1.2",
+    "@fastify/rate-limit": "^11.2.1",
+    "@fastify/static": "^10.1.5",
+    "@fastify/websocket": "^11.3.3",
+    "fastify": "^5.12.5"
+  }
+}

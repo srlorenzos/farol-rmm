@@ -1,0 +1,22 @@
+# Unit systemd do agente Farol RMM.
+# Instalação:
+#   sudo install -Dm755 farol_agente.py /opt/farol/farol_agente.py
+#   sudo cp farol-agente.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now farol-agente
+[Unit]
+Description=Farol RMM - agente de monitoramento
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /opt/farol/farol_agente.py rodar --config /etc/farol/config.json
+Restart=always
+RestartSec=10
+# O agente executa scripts remotos como root; mantenha o servidor protegido (2FA, HTTPS).
+User=root
+NoNewPrivileges=false
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

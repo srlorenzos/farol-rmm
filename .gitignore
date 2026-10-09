@@ -1,0 +1,7 @@
+node_modules/
+.env
+dados/
+*.db
+*.db-*
+__pycache__/
+.venv/
