@@ -38,11 +38,15 @@ export function tabelaVirtual(o) {
   const vazioEl = h('div', { hidden: true });
   const el = h('div', { class: 'tv', role: 'grid', 'aria-label': o.rotulo ?? 'Tabela', 'aria-multiselectable': o.selecionavel ? 'true' : null }, rolagem, vazioEl, rodape);
 
-  const grade = () => [o.selecionavel ? '44px' : null, ...colunas.map((c) => c.largura ?? 'minmax(120px, 1fr)')].filter(Boolean).join(' ');
+  const larguras = () => [o.selecionavel ? '44px' : null, ...colunas.map((c) => c.largura ?? 'minmax(120px, 1fr)')].filter(Boolean);
+  const grade = () => larguras().join(' ');
+  /** Largura mínima da grade (soma dos mínimos): cabeçalho e linhas usam a mesma, senão as colunas "fr" desalinham. */
+  const larguraMinima = () => larguras().reduce((n, l) => n + (Number((/(\d+)px/.exec(l) ?? [])[1]) || 120), 0);
 
   function desenharCabecalho() {
     limpar(cabecalho);
     cabecalho.style.gridTemplateColumns = grade();
+    cabecalho.style.minWidth = corpo.style.minWidth = `${larguraMinima()}px`;
     if (o.selecionavel) {
       const todos = h('input', { type: 'checkbox', class: 'check', 'aria-label': 'Selecionar todas as linhas filtradas' });
       const n = linhas.length;

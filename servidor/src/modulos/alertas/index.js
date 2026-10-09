@@ -175,7 +175,8 @@ export default {
         WHERE revogado = 0 AND status = 'offline' AND ultimo_checkin < ?`).all(agora - regra.minutos * 60_000);
       for (const a of antigos) {
         const min = Math.floor((agora - a.ultimo_checkin) / 60_000);
-        ctx.servicos.alertas.abrir(a, { tipo: 'offline', severidade: 'critico', valor: min, mensagem: `Sem check-in há ${min} min (limite ${regra.minutos} min)` });
+        const tempo = min < 60 ? `${min} min` : min < 1440 ? `${Math.floor(min / 60)} h ${min % 60} min` : `${Math.floor(min / 1440)} d ${Math.floor((min % 1440) / 60)} h`;
+        ctx.servicos.alertas.abrir(a, { tipo: 'offline', severidade: 'critico', valor: min, mensagem: `Sem check-in há ${tempo} (limite ${regra.minutos} min)` });
       }
     });
   },

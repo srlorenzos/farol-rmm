@@ -67,20 +67,20 @@ export default {
 
     // ---------- colunas da lista ----------
     const col = (def) => farol.colunaDispositivo(def);
-    col({ id: 'status', rotulo: 'Status', largura: '118px', ordem: 10, render: (a) => estadoDispositivo(a.status), valor: (a) => ({ online: 0, pendente: 1, offline: 2 }[a.status] ?? 3) });
-    col({ id: 'dispositivo', rotulo: 'Dispositivo', largura: 'minmax(220px, 1.6fr)', ordem: 20, fixa: true, render: celulaDispositivo, valor: (a) => a.hostname.toLowerCase() });
-    col({ id: 'site', rotulo: 'Cliente · site', largura: 'minmax(150px, 1fr)', ordem: 30, render: (a) => h('div', { class: 'celula-duas-linhas' }, h('span', { text: a.site_nome }), h('span', { class: 'sub sutil pequeno', text: a.cliente_nome })), valor: (a) => `${a.cliente_nome} ${a.site_nome}` });
-    col({ id: 'so', rotulo: 'Sistema', largura: 'minmax(170px, 1.1fr)', ordem: 40, render: (a) => h('span', { class: 'muted', title: a.so_versao ?? '', text: nomeSo(a) }), valor: (a) => nomeSo(a) });
-    col({ id: 'usuario', rotulo: 'Usuário', largura: '130px', ordem: 50, render: (a) => h('span', { class: 'muted', text: a.usuario_logado || '—' }), valor: (a) => a.usuario_logado });
+    col({ id: 'status', rotulo: 'Status', largura: '96px', ordem: 10, render: (a) => estadoDispositivo(a.status), valor: (a) => ({ online: 0, pendente: 1, offline: 2 }[a.status] ?? 3) });
+    col({ id: 'dispositivo', rotulo: 'Dispositivo', largura: 'minmax(190px, 1.5fr)', ordem: 20, fixa: true, render: celulaDispositivo, valor: (a) => a.hostname.toLowerCase() });
+    col({ id: 'site', rotulo: 'Cliente · site', largura: 'minmax(130px, 1fr)', ordem: 30, render: (a) => h('div', { class: 'celula-duas-linhas' }, h('span', { text: a.site_nome }), h('span', { class: 'sub sutil pequeno', text: a.cliente_nome })), valor: (a) => `${a.cliente_nome} ${a.site_nome}` });
+    col({ id: 'so', rotulo: 'Sistema', largura: 'minmax(130px, 1fr)', ordem: 40, render: (a) => h('span', { class: 'muted', title: a.so_versao ?? '', text: nomeSo(a) }), valor: (a) => nomeSo(a) });
+    col({ id: 'usuario', rotulo: 'Usuário', largura: '120px', ordem: 50, padrao: false, render: (a) => h('span', { class: 'muted', text: a.usuario_logado || '—' }), valor: (a) => a.usuario_logado });
     col({ id: 'ip', rotulo: 'IP', largura: '128px', ordem: 55, padrao: false, render: (a) => h('span', { class: 'mono pequeno', text: a.ip_local || '—' }), valor: (a) => a.ip_local });
-    col({ id: 'contato', rotulo: 'Último contato', largura: '128px', ordem: 60, render: (a) => h('span', { class: 'muted', title: a.ultimo_checkin ? new Date(a.ultimo_checkin).toLocaleString('pt-BR') : '', text: relativo(a.ultimo_checkin) }), valor: (a) => -(a.ultimo_checkin ?? 0) });
-    col({ id: 'cpu', rotulo: 'CPU', largura: '120px', ordem: 70, render: (a) => medidor(a.status === 'online' ? a.cpu_pct : null, 'CPU'), valor: (a) => a.cpu_pct });
-    col({ id: 'ram', rotulo: 'RAM', largura: '120px', ordem: 80, render: (a) => medidor(a.status === 'online' ? ramPct(a) : null, 'RAM'), valor: (a) => ramPct(a) });
-    col({ id: 'disco', rotulo: 'Disco', largura: '120px', ordem: 90, render: (a) => medidor(a.disco_max_pct, 'Disco'), valor: (a) => a.disco_max_pct });
+    col({ id: 'contato', rotulo: 'Contato', largura: '100px', ordem: 60, render: (a) => h('span', { class: 'muted', title: a.ultimo_checkin ? new Date(a.ultimo_checkin).toLocaleString('pt-BR') : '', text: relativo(a.ultimo_checkin) }), valor: (a) => -(a.ultimo_checkin ?? 0) });
+    col({ id: 'cpu', rotulo: 'CPU', largura: '92px', ordem: 70, render: (a) => medidor(a.status === 'online' ? a.cpu_pct : null, 'CPU'), valor: (a) => a.cpu_pct });
+    col({ id: 'ram', rotulo: 'RAM', largura: '92px', ordem: 80, render: (a) => medidor(a.status === 'online' ? ramPct(a) : null, 'RAM'), valor: (a) => ramPct(a) });
+    col({ id: 'disco', rotulo: 'Disco', largura: '92px', ordem: 90, render: (a) => medidor(a.disco_max_pct, 'Disco'), valor: (a) => a.disco_max_pct });
     // Placeholder até o módulo de patches existir: ele registra uma coluna própria (patch_status) e esta some.
-    col({ id: 'patches', rotulo: 'Patches', largura: '112px', ordem: 95, render: (a) => (a.patch_status ? selo(a.patch_status, 'info') : h('span', { class: 'sutil pequeno', 'data-dica': 'Gestão de patches chega em breve', text: 'Não avaliado' })), valor: (a) => a.patch_status });
+    col({ id: 'patches', rotulo: 'Patches', largura: '104px', ordem: 95, render: (a) => (a.patch_status ? selo(a.patch_status, 'info') : h('span', { class: 'sutil pequeno', 'data-dica': 'Gestão de patches chega em breve', text: 'Não avaliado' })), valor: (a) => a.patch_status });
     col({ id: 'versao', rotulo: 'Agente', largura: '90px', ordem: 120, padrao: false, render: (a) => h('span', { class: 'mono pequeno sutil', text: a.versao_agente ? `v${a.versao_agente}` : '—' }), valor: (a) => a.versao_agente });
-    col({ id: 'acoes', rotulo: '', rotuloAria: 'Ações', largura: '84px', ordem: 999, fixa: true, ordenavel: false, render: (a) => {
+    col({ id: 'acoes', rotulo: '', rotuloAria: 'Ações', largura: '72px', ordem: 999, fixa: true, ordenavel: false, render: (a) => {
       const mais = h('button', { class: 'btn-icone pequeno', 'aria-label': `Ações de ${a.hostname}`, 'data-dica': 'Ações', onclick: (ev) => abrirMenu(ev.currentTarget, itensAcoes(a), { alinhar: 'fim', rotulo: 'Ações' }) }, icone('reticencias'));
       return h('div', { class: 'acoes-linha' }, h('a', { class: 'btn-icone pequeno', href: `#/dispositivos/${a.id}`, 'aria-label': `Abrir ${a.hostname}`, 'data-dica': 'Abrir' }, icone('chevron')), mais);
     } });
@@ -109,8 +109,8 @@ export default {
     // ---------- widgets ----------
     farol.widget({ id: 'frota', titulo: 'Estado da frota', ordem: 10, tamanho: 4, permissao: 'dispositivos.ver', render: widgetFrota });
     farol.widget({ id: 'disco', titulo: 'Saúde de disco', ordem: 30, tamanho: 4, permissao: 'dispositivos.ver', render: widgetDisco });
-    farol.widget({ id: 'sistemas', titulo: 'Sistemas operacionais', ordem: 40, tamanho: 4, permissao: 'dispositivos.ver', render: widgetSistemas });
-    farol.widget({ id: 'maior-uso', titulo: 'Maior uso de recursos', ordem: 50, tamanho: 6, permissao: 'dispositivos.ver', render: widgetMaiorUso });
+    farol.widget({ id: 'sistemas', titulo: 'Sistemas operacionais', ordem: 50, tamanho: 4, permissao: 'dispositivos.ver', render: widgetSistemas });
+    farol.widget({ id: 'maior-uso', titulo: 'Maior uso de recursos', ordem: 40, tamanho: 8, permissao: 'dispositivos.ver', render: widgetMaiorUso });
 
     // ---------- paleta ----------
     farol.comando({ id: 'adicionar-dispositivo', rotulo: 'Adicionar dispositivo', descricao: 'Gerar token de instalação do agente', icone: 'mais', palavras: 'instalar agente token novo', permissao: 'dispositivos.instalar', executar: adicionarDispositivo });
@@ -197,8 +197,7 @@ function widgetMaiorUso(el) {
       preencher(corpo, r.piores.length ? h('ul', { class: 'lista-linhas' }, r.piores.map((a) => h('li', {},
         h('a', { class: 'linha-item', href: `#/dispositivos/${a.id}` },
           h('div', { class: 'linha-texto' }, h('span', { class: 'forte', text: a.hostname }), h('small', { text: `${a.site_nome} · ${nomeSo(a)}` })),
-          h('div', { class: 'pilha-2', estilo: { width: '46%', minWidth: '180px' } },
-            medidor(a.cpu_pct, 'CPU', { rotulo: true }), medidor(ramPct(a), 'RAM', { rotulo: true }), medidor(a.disco_max_pct, 'Disco', { rotulo: true }))))))
+          h('div', { class: 'uso-trio' }, medidor(a.cpu_pct, 'CPU', { rotulo: true }), medidor(ramPct(a), 'RAM', { rotulo: true }), medidor(a.disco_max_pct, 'Disco', { rotulo: true }))))))
         : vazio({ titulo: 'Nenhum dispositivo online', texto: 'Quando houver dispositivos conectados, os mais carregados aparecem aqui.', compacto: true }));
     } catch (e) { toastErro(e); }
   };

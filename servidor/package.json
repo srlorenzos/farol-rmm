@@ -12,6 +12,8 @@
   "scripts": {
     "start": "node src/servidor.js",
     "criar-admin": "node scripts/criar-admin.js",
+    "demo": "node scripts/demo.js",
+    "validar-biblioteca": "node scripts/validar-biblioteca.mjs",
     "test": "node --test"
   },
   "dependencies": {

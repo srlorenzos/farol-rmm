@@ -45,7 +45,7 @@ function colunas({ comDispositivo = true } = {}) {
     { id: 'msg', rotulo: 'Mensagem', largura: 'minmax(240px, 2fr)', render: (a) => h('span', { title: a.mensagem, text: a.mensagem }), valor: (a) => a.mensagem },
     { id: 'quando', rotulo: 'Aberto', largura: '130px', render: (a) => h('span', { class: 'muted', title: fmtData(a.aberto_em), text: relativo(a.aberto_em) }), valor: (a) => -a.aberto_em },
     { id: 'estado', rotulo: 'Estado', largura: '170px', render: (a) => (a.status === 'aberto'
-      ? selo(`Aberto há ${duracao(Date.now() - a.aberto_em)}`, 'critico')
+      ? selo(`Aberto há ${duracao(Date.now() - a.aberto_em)}`, 'neutro', { icone: 'relogio' })
       : h('span', { class: 'sutil pequeno', title: a.resolvido_por ? `por ${a.resolvido_por}` : 'automaticamente', text: `Resolvido · durou ${duracao(a.resolvido_em - a.aberto_em)}` })), valor: (a) => (a.status === 'aberto' ? 0 : 1) },
     { id: 'acao', rotulo: '', rotuloAria: 'Ações', largura: '104px', ordenavel: false, render: (a) => (a.status === 'aberto' && pode('alertas.resolver')
       ? h('div', { class: 'acoes-linha' }, botao('Resolver', { tamanho: 'pequeno', icone: 'check', onclick: () => resolver([a.id]) })) : null) },

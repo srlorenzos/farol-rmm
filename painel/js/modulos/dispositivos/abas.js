@@ -40,7 +40,7 @@ export function abaResumo(el, { agente: a }) {
       ['Canal em tempo real', a.tempo_real ? selo('Conectado', 'ok', { icone: 'raio' }) : selo('Só check-in', 'neutro')],
       ['Registrado em', fmtData(a.registrado_em)], ['Último contato', fmtData(a.ultimo_checkin, { segundos: true })],
       ['Site', `${a.cliente_nome} · ${a.site_nome}`], ['Capacidades', (a.capacidades ?? []).length ? `${a.capacidades.length} comandos e sessões` : null],
-      ['ID', h('code', { class: 'inline', text: a.id })],
+      ['ID', h('span', { class: 'mono pequeno sutil truncar', title: a.id, text: a.id })],
     ]),
   });
 
@@ -77,7 +77,7 @@ const wrap = (n, t) => { n.dataset.tamanho = String(t); return n; };
 function linhaMetrica(nome, pct, detalhe) {
   return h('div', { class: 'pilha-2' },
     h('div', { class: 'linha-entre' }, h('span', { class: 'pequeno muted', text: nome }), h('strong', { class: 'tabular', text: fmtPct(pct) })),
-    medidor(pct, nome, { grande: true }),
+    medidor(pct, nome, { grande: true, semTexto: true }),
     detalhe ? h('span', { class: 'pequeno sutil', text: detalhe }) : null);
 }
 

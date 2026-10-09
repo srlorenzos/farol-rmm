@@ -25,7 +25,7 @@ export default {
     farol.acaoLote({ id: 'executar-script', rotulo: 'Executar script', icone: 'play', ordem: 10, primaria: true, permissao: 'scripts.executar',
       executar: (sel) => executarScript({ agentes: sel }) });
     farol.abaDispositivo({ id: 'execucoes', rotulo: 'Execuções', icone: 'execucoes', ordem: 50, permissao: 'jobs.ver', render: abaExecucoes });
-    farol.widget({ id: 'execucoes', titulo: 'Últimas execuções', ordem: 60, tamanho: 6, permissao: 'jobs.ver', render: widgetExecucoes });
+    farol.widget({ id: 'execucoes', titulo: 'Últimas execuções', ordem: 60, tamanho: 12, permissao: 'jobs.ver', render: widgetExecucoes });
 
     farol.comando({ id: 'executar-script', rotulo: 'Executar script…', descricao: 'Escolher script e alvo', icone: 'play', palavras: 'rodar job automação', permissao: 'scripts.executar', executar: () => executarScript() });
     farol.comando({ id: 'novo-script', rotulo: 'Novo script', icone: 'mais', palavras: 'criar escrever', permissao: 'scripts.editar', executar: () => { location.hash = '#/scripts/novo'; } });

@@ -149,7 +149,9 @@ select.input, .select {
 .input-curto { width: 84px; }
 .input-mono { font-family: var(--fonte-mono); }
 
-.busca { position: relative; display: flex; align-items: center; min-width: 200px; flex: 0 1 300px; }
+.busca { position: relative; display: flex; align-items: center; min-width: 180px; width: 300px; max-width: 100%; flex: 0 1 auto; }
+.busca.cresce { flex: 1 1 240px; width: auto; }
+.pilha > .busca, .pilha-2 > .busca, .form > .busca { width: 100%; }
 .busca .icone { position: absolute; left: 10px; --tam-icone: 16px; color: var(--texto-3); pointer-events: none; }
 .busca .input { padding-left: 32px; }
 
@@ -328,6 +330,12 @@ a.cartao:hover, .cartao.clicavel:hover { border-color: var(--borda-forte); box-s
 .medidor-rotulo { width: 38px; font-size: var(--t-12); color: var(--texto-3); flex-shrink: 0; }
 .medidor.grande .medidor-trilho { height: 8px; }
 .medidor-vazio .medidor-texto { color: var(--texto-3); }
+.tv .medidor { gap: 6px; }
+.tv .medidor-trilho { min-width: 28px; }
+.tv .medidor-texto { width: 32px; }
+.uso-trio { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--e-4); width: 58%; min-width: 300px; }
+.uso-trio .medidor-rotulo { width: auto; }
+@media (max-width: 700px) { .uso-trio { grid-template-columns: 1fr; width: 46%; min-width: 150px; gap: 4px; } }
 
 /* ================================ tabelas ================================ */
 .tabela-caixa { position: relative; overflow: auto; border-radius: inherit; }
@@ -369,19 +377,18 @@ a.cartao:hover, .cartao.clicavel:hover { border-color: var(--borda-forte); box-s
 .tv-cabecalho {
   position: sticky; top: 0; z-index: 3;
   display: grid; align-items: center;
-  height: 40px; min-width: max-content;
+  height: 40px;
   background: var(--superficie-2);
   border-bottom: 1px solid var(--borda);
   color: var(--texto-3);
   font-size: var(--t-12); font-weight: var(--peso-medio);
 }
-.tv-corpo { position: relative; min-width: max-content; }
+.tv-corpo { position: relative; }
 .tv-linha {
   position: absolute; left: 0; right: 0;
   display: grid; align-items: center;
   height: var(--linha-tabela);
   border-bottom: 1px solid var(--borda);
-  min-width: max-content;
   transition: background var(--dur-1);
 }
 .tv-linha:hover { background: color-mix(in srgb, var(--superficie-2) 75%, transparent); }
@@ -400,7 +407,6 @@ a.cartao:hover, .cartao.clicavel:hover { border-color: var(--borda-forte); box-s
   background: var(--superficie-0);
   border-bottom: 1px solid var(--borda);
   font-size: var(--t-12); font-weight: var(--peso-forte); color: var(--texto-2);
-  min-width: max-content;
 }
 .tv-grupo .tv-grupo-n { color: var(--texto-3); font-weight: var(--peso-normal); }
 .tv-rodape { display: flex; align-items: center; justify-content: space-between; gap: var(--e-3); padding: var(--e-2) var(--e-4); border-top: 1px solid var(--borda); font-size: var(--t-12); color: var(--texto-3); }
@@ -411,6 +417,8 @@ a.cartao:hover, .cartao.clicavel:hover { border-color: var(--borda-forte); box-s
 .celula-dispositivo { display: flex; align-items: center; gap: var(--e-2); min-width: 0; }
 .celula-dispositivo .nome { font-weight: var(--peso-medio); color: var(--texto-1); overflow: hidden; text-overflow: ellipsis; }
 .celula-dispositivo a { color: inherit; }
+.tv-celula a { color: var(--texto-1); }
+.tv-celula a:hover { color: var(--marca-forte); text-decoration: none; }
 .celula-dispositivo .sub { color: var(--texto-3); font-size: var(--t-12); }
 .celula-duas-linhas { display: flex; flex-direction: column; line-height: 1.3; min-width: 0; }
 .celula-duas-linhas > * { overflow: hidden; text-overflow: ellipsis; }
@@ -671,8 +679,8 @@ button.linha-item { width: 100%; text-align: left; }
 .lista-def dt { color: var(--texto-3); }
 .lista-def dd { color: var(--texto-1); min-width: 0; overflow-wrap: anywhere; }
 
-.fatos { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1px; background: var(--borda); border-radius: var(--raio-3); overflow: hidden; border: 1px solid var(--borda); }
-.fato { background: var(--superficie-1); padding: var(--e-3) var(--e-4); display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.fatos { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); background: var(--superficie-1); border-radius: var(--raio-3); overflow: hidden; border: 1px solid var(--borda); }
+.fato { box-shadow: 1px 0 0 var(--borda), 0 1px 0 var(--borda); padding: var(--e-3) var(--e-4); display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .fato dt { font-size: var(--t-11); text-transform: uppercase; letter-spacing: 0.06em; color: var(--texto-3); font-weight: var(--peso-medio); }
 .fato dd { font-size: var(--t-13); color: var(--texto-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 

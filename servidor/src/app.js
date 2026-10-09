@@ -30,6 +30,7 @@ export async function criarApp(opcoes = {}) {
   const app = Fastify({
     logger: opcoes.logger ?? false,
     trustProxy: config.confiarProxy,
+    ajv: { customOptions: { allowUnionTypes: true } },
     bodyLimit: 1024 * 1024, // rotas que precisam de mais (check-in com inventário) declaram o próprio limite
   });
   const ctx = criarContexto({ db, config, log: app.log });
@@ -66,6 +67,8 @@ export async function criarApp(opcoes = {}) {
     max: config.limites.global,
     timeWindow: '1 minute',
     keyGenerator: (req) => (req.url.startsWith('/api/agente/') ? chaveLimiteAgente(req) : req.ip),
+    // Arquivos estáticos do painel (dezenas de módulos JS/CSS por carregamento) não contam no limite da API.
+    allowList: (req) => !req.url.startsWith('/api/') && !req.url.startsWith('/download/'),
     errorResponseBuilder: (_req, c) => ({ statusCode: 429, erro: `Muitas requisições. Aguarde ${Math.ceil(c.ttl / 1000)} s.` }),
   });
 

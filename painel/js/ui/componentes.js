@@ -133,7 +133,7 @@ export function medidor(pct, nome, o = {}) {
   return h('span', { class: ['medidor', o.grande && 'grande', pct == null && 'medidor-vazio'], title: `${nome}: ${fmtPct(pct)}` },
     o.rotulo ? h('span', { class: 'medidor-rotulo', text: nome }) : null,
     h('span', { class: 'medidor-trilho', role: 'meter', 'aria-label': nome, 'aria-valuemin': 0, 'aria-valuemax': 100, 'aria-valuenow': Math.round(pct ?? 0) }, valor),
-    h('span', { class: 'medidor-texto', text: fmtPct(pct) }));
+    o.semTexto ? null : h('span', { class: 'medidor-texto', text: fmtPct(pct) }));
 }
 
 // ------------------------------------------------------------------ estrutura

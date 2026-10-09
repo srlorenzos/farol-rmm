@@ -232,8 +232,12 @@ body.lateral-recolhida .lateral-recolher .icone { transform: rotate(180deg); }
   body.menu-aberto .cortina-menu { opacity: 1; pointer-events: auto; }
   .topo { padding: 0 var(--e-3); gap: var(--e-2); }
   .topo .botao-menu { display: inline-grid; }
-  .busca-global { width: auto; flex: 1; min-width: 0; }
-  .busca-global kbd { display: none; }
+  .busca-global { width: 34px; flex: none; padding: 0; justify-content: center; }
+  .busca-global span, .busca-global kbd { display: none; }
+  .topo-espaco { display: none; }
+  .topo-acoes { margin-left: auto; }
+  .seletor-escopo { flex: 1; min-width: 0; max-width: none; }
+  .cabecalho-dispositivo .avatar-dispositivo { display: none; }
   .grade-2, .grade-3, .dividido { grid-template-columns: minmax(0, 1fr); }
   .grade-widgets > [data-tamanho] { grid-column: span 12; }
   .pagina { padding: var(--e-4) var(--e-4) var(--e-10); }
