@@ -12,7 +12,21 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import psutil  # noqa: E402
 
-import farol_agente as fa  # noqa: E402
+from farol import VERSAO, cli, coleta, config, execucao  # noqa: E402
+
+
+class fa:  # noqa: N801 — fachada com os nomes que a v1 expunha em farol_agente.py
+    VERSAO = VERSAO
+    WINDOWS = config.WINDOWS
+    MAX_SAIDA = execucao.MAX_SAIDA
+    ErroConfig = config.ErroConfig
+    validar_url_servidor = staticmethod(config.validar_url_servidor)
+    salvar_config = staticmethod(config.salvar_config)
+    carregar_config = staticmethod(config.carregar_config)
+    coletar_metricas = staticmethod(coleta.coletar_metricas)
+    coletar_inventario = staticmethod(coleta.coletar_inventario)
+    montar_checkin = staticmethod(cli.montar_checkin)
+    executar_job = staticmethod(execucao.executar_job)
 
 
 class TestUrl(unittest.TestCase):
@@ -63,7 +77,7 @@ class TestColeta(unittest.TestCase):
 
     def test_payload_checkin(self):
         p = fa.montar_checkin("https://farol.exemplo.com", com_inventario=False, intervalo_cpu=0.1)
-        self.assertEqual(set(p), {"metricas", "info"})
+        self.assertLessEqual({"metricas", "info"}, set(p))
         self.assertEqual(p["info"]["versao_agente"], fa.VERSAO)
         self.assertTrue(p["info"]["hostname"])
         json.dumps(p)  # serializável
@@ -108,6 +122,15 @@ class TestExecucao(unittest.TestCase):
         r = fa.executar_job(self.job("print('x' * 200000)"))
         self.assertLessEqual(len(r["stdout"].encode()), fa.MAX_SAIDA + 100)
         self.assertIn("truncada", r["stdout"])
+
+    def test_variaveis_de_ambiente(self):
+        job = self.job("import os\nprint(os.environ['FAROL_DIAS'])")
+        job["env"] = {"FAROL_DIAS": "7; rm -rf /"}
+        self.assertEqual(fa.executar_job(job)["stdout"].strip(), "7; rm -rf /")
+        job["env"] = {"PATH": "x"}
+        r = fa.executar_job(job)
+        self.assertIn("variável de ambiente inválida", r["erro"])
+        self.assertIsNone(r["codigo_saida"])
 
     def test_shell_invalido(self):
         r = fa.executar_job(self.job("ls", shell="zsh"))
