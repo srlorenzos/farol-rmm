@@ -3,7 +3,7 @@
 Objetivo: RMM completo no nível do Datto RMM (funções + visual premium), identidade própria.
 
 ## Etapa 1 (em andamento, 2026-10-09)
-- [~] Base modular + revisão + visual premium (agente arquiteto). FEITO e commitado: núcleo modular do servidor (módulos, migrações, RBAC, alvos, relay WS) com testes; agente como pacote `farol/` com canal WS; design system + shell + paleta Ctrl+K; todas as telas migradas para módulos do painel. FALTA (próxima janela): teste ponta a ponta, screenshots e refino visual, `painel/DESIGN.md`, README "Como usar", conferir ARQUITETURA.md.
+- [x] Base modular + revisão + visual premium: núcleo modular, RBAC, alvos, relay WS (job em ~300 ms), agente em pacote, design system, Ctrl+K, todas as telas. 53 testes servidor + 26 agente; e2e ok; screenshots revisados. Pendente: `painel/DESIGN.md` e README "Como usar" da v2.
 - [x] Biblioteca: 551 scripts (393 Windows, 141 Linux, 21 macOS; 88 monitores) em 31 categorias, validador com 0 erros, sintaxe ok (PS/bash/py), 97 scripts Windows executados de verdade sem erro. Linux/macOS só checados por sintaxe. `.ps1` em UTF-8 com BOM (o carregador precisa tolerar). Gerador fora do repo: scratchpad `gen.mjs` + `b/*.txt`.
 
 ## Etapa 2 (depois da etapa 1, em paralelo, cada um num módulo)
