@@ -8,7 +8,7 @@ test('token de instalação: uso único, inválido e expirado', async () => {
   const { c } = await adminElevado(app, db, { elevar: false });
   const { json: tok } = await c.post('/api/tokens-instalacao', { descricao: 'filial' });
   assert.equal(tok.token.length, 43);
-  assert.match(tok.comandos.windows, /farol_agente\.py instalar --servidor/);
+  assert.match(tok.comandos.windows, /farol-agente.pyz instalar --servidor/);
   assert.match(tok.comandos.linux, /curl -fsSLO/);
   assert.notEqual(db.prepare('SELECT token_hash FROM tokens_instalacao').get().token_hash, tok.token, 'só hash no banco');
 
@@ -86,7 +86,7 @@ test('agente fica offline sem check-in em 60 s e volta ao fazer check-in', async
   const { c } = await adminElevado(app, db, { elevar: false });
   const ag = await registrarAgente(app, c);
   await ag.checkin();
-  tarefasPeriodicas(ctx, Date.now() + 61_000);
+  await tarefasPeriodicas(ctx, Date.now() + 61_000);
   assert.equal((await c.get(`/api/agentes/${ag.id}`)).json.status, 'offline');
   await ag.checkin();
   assert.equal((await c.get(`/api/agentes/${ag.id}`)).json.status, 'online');

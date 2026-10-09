@@ -6,8 +6,10 @@ import { parseArgs } from 'node:util';
 import { stdin, stdout } from 'node:process';
 import { abrirBanco } from '../src/db.js';
 import { carregarConfig } from '../src/config.js';
-import { criarUsuario, validarSenhaForte } from '../src/rotas/auth.js';
-import { auditar } from '../src/nucleo.js';
+import { criarUsuario, validarSenhaForte } from '../src/modulos/auth/index.js';
+import { auditar } from '../src/nucleo/contexto.js';
+import { MIGRACOES_NUCLEO } from '../src/nucleo/esquema.js';
+import { aplicarMigracoes } from '../src/nucleo/migracoes.js';
 
 const { values } = parseArgs({
   options: { usuario: { type: 'string' }, senha: { type: 'string' }, db: { type: 'string' } },
@@ -15,6 +17,7 @@ const { values } = parseArgs({
 
 const config = carregarConfig(values.db ? { caminhoBanco: values.db } : {});
 const db = abrirBanco(config.caminhoBanco);
+aplicarMigracoes(db, 'nucleo', MIGRACOES_NUCLEO);
 
 async function perguntarOculto(rl, pergunta) {
   // Esconde a digitação substituindo o eco do terminal.
@@ -52,4 +55,4 @@ if (db.prepare('SELECT 1 FROM usuarios WHERE usuario = ?').get(usuario)) {
 await criarUsuario(db, usuario, senha);
 auditar(db, { usuario, acao: 'admin_criado', alvo: usuario, detalhes: 'via terminal' });
 db.close();
-console.log(`Administrador "${usuario}" criado. Ative o 2FA em Configurações no primeiro acesso.`);
+console.log(`Administrador "${usuario}" criado. Ative o 2FA em Minha conta no primeiro acesso.`);

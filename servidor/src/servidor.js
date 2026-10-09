@@ -1,7 +1,7 @@
 // Ponto de entrada: `npm start`.
 import { criarApp } from './app.js';
 import { carregarConfig } from './config.js';
-import { totalUsuarios } from './rotas/auth.js';
+import { totalUsuarios } from './modulos/auth/index.js';
 
 const config = carregarConfig();
 const app = await criarApp({ config, logger: { level: process.env.LOG_LEVEL || 'info' } });

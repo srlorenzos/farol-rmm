@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { novoApp, cliente, codigoAtual, SENHA } from './ajuda.js';
-import { criarUsuario } from '../src/rotas/auth.js';
+import { criarUsuario } from '../src/modulos/auth/index.js';
 
 test('setup inicial só funciona sem usuários e exige senha forte', async () => {
   const { app } = await novoApp();

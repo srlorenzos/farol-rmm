@@ -1,11 +1,5 @@
-// Dados iniciais: scripts de exemplo e regras de alerta padrão.
+// Scripts de exemplo semeados na primeira inicialização (biblioteca do usuário).
 
-export const REGRAS_PADRAO = {
-  cpu: { ativo: true, limite: 90, ciclos: 4 },
-  ram: { ativo: true, limite: 90, ciclos: 4 },
-  disco: { ativo: true, limite: 90 },
-  offline: { ativo: true, minutos: 5 },
-};
 
 export const SCRIPTS_EXEMPLO = [
   {

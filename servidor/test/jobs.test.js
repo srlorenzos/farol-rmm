@@ -25,7 +25,7 @@ test('executar exige 2FA ativo e modo elevado', async () => {
 
 test('sem 2FA ativo não é possível executar nem elevar', async () => {
   const { app, db } = await novoApp();
-  const { criarUsuario } = await import('../src/rotas/auth.js');
+  const { criarUsuario } = await import('../src/modulos/auth/index.js');
   const { cliente, SENHA } = await import('./ajuda.js');
   await criarUsuario(db, 'admin', SENHA);
   const c = cliente(app);
@@ -48,7 +48,8 @@ test('job: criação → entrega no check-in → resultado', async () => {
 
   const exec = await c.post('/api/executar', { agentes: [a1.id, a2.id], script_id: script.id });
   assert.equal(exec.status, 200);
-  assert.equal(exec.json.jobs.length, 2);
+  assert.equal(exec.json.jobs.length, 1, 'script cmd é só Windows');
+  assert.equal(exec.json.ignorados[0].hostname, 'srv-linux');
 
   const ck = (await a1.checkin()).json();
   assert.equal(ck.jobs.length, 1);
@@ -58,6 +59,8 @@ test('job: criação → entrega no check-in → resultado', async () => {
   assert.equal((await a1.checkin()).json().jobs.length, 0);
 
   const jobId = ck.jobs[0].id;
+  // o agente Linux não recebeu nada
+  assert.equal((await a2.checkin()).json().jobs.length, 0);
   // outro agente não pode reportar o job
   assert.equal((await a2.resultado({ job_id: jobId, codigo_saida: 0, stdout: 'x' })).statusCode, 404);
   const res = await a1.resultado({ job_id: jobId, codigo_saida: 0, stdout: 'ola\n', stderr: '', duracao_ms: 42 });
@@ -89,7 +92,7 @@ test('comando rápido, falha, timeout e expiração', async () => {
   const t = (await c.get(`/api/jobs/${j2.id}`)).json;
   assert.equal(t.status, 'timeout');
   assert.match(t.stderr, /tempo limite/);
-  tarefasPeriodicas(ctx, Date.now() + 5_000 + 121_000);
+  await tarefasPeriodicas(ctx, Date.now() + 5_000 + 121_000);
   assert.equal((await c.get(`/api/jobs/${j3.id}`)).json.status, 'expirado');
   assert.ok(db.prepare("SELECT 1 FROM auditoria WHERE acao = 'comando_executado'").get());
   await app.close();

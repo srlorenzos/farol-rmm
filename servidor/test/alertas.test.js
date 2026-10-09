@@ -42,9 +42,9 @@ test('offline prolongado abre alerta; check-in resolve', async () => {
   const { c } = await adminElevado(app, db, { elevar: false });
   const ag = await registrarAgente(app, c);
   await ag.checkin();
-  tarefasPeriodicas(ctx, Date.now() + 2 * 60_000);
+  await tarefasPeriodicas(ctx, Date.now() + 2 * 60_000);
   assert.equal((await abertos(c)).length, 0, 'offline, mas ainda dentro dos 5 min');
-  tarefasPeriodicas(ctx, Date.now() + 6 * 60_000);
+  await tarefasPeriodicas(ctx, Date.now() + 6 * 60_000);
   const lista = await abertos(c);
   assert.equal(lista.length, 1);
   assert.equal(lista[0].tipo, 'offline');

@@ -1,15 +1,22 @@
 // Utilitários de teste: app com banco em memória e cliente com cookie.
+import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 import { criarApp } from '../src/app.js';
 import { carregarConfig } from '../src/config.js';
 import { abrirBanco } from '../src/db.js';
-import { criarUsuario } from '../src/rotas/auth.js';
+import { criarUsuario } from '../src/modulos/auth/index.js';
 import { totp, base32Decodificar } from '../src/seguranca.js';
 
 export const SENHA = 'Senha-Forte-123';
 
+export const PASTA_FIXTURES = fileURLToPath(new URL('./fixtures/', import.meta.url));
+
 export async function novoApp(sobrescrever = {}) {
   const db = abrirBanco(':memory:');
-  const config = carregarConfig({ caminhoBanco: ':memory:', tarefasPeriodicas: false, webhookUrl: '', urlPublica: '', https: false, ...sobrescrever });
+  const config = carregarConfig({
+    caminhoBanco: ':memory:', tarefasPeriodicas: false, webhookUrl: '', urlPublica: '', https: false,
+    pastaBiblioteca: join(PASTA_FIXTURES, 'biblioteca'), ...sobrescrever,
+  });
   const app = await criarApp({ config, db });
   return { app, db, ctx: app.farol };
 }
@@ -45,10 +52,10 @@ export function codigoAtual(segredo, deslocamentoPassos = 0) {
 }
 
 /** Cria admin, faz login, ativa 2FA e entra em modo elevado. Retorna { c, segredo }. */
-export async function adminElevado(app, db, { elevar = true } = {}) {
-  await criarUsuario(db, 'admin', SENHA);
+export async function adminElevado(app, db, { elevar = true, usuario = 'admin', papel = 'admin' } = {}) {
+  await criarUsuario(db, usuario, SENHA, { papel });
   const c = cliente(app);
-  await c.post('/api/login', { usuario: 'admin', senha: SENHA });
+  await c.post('/api/login', { usuario, senha: SENHA });
   const { json } = await c.post('/api/2fa/iniciar');
   await c.post('/api/2fa/ativar', { codigo: codigoAtual(json.segredo) });
   if (elevar) {
@@ -58,7 +65,7 @@ export async function adminElevado(app, db, { elevar = true } = {}) {
   return { c, segredo: json.segredo };
 }
 
-export const INFO = { hostname: 'pc-teste', so: 'Windows', so_versao: '11', arquitetura: 'AMD64', versao_agente: '0.1.0' };
+export const INFO = { hostname: 'pc-teste', so: 'Windows', so_versao: '11', arquitetura: 'AMD64', versao_agente: '2.0.0' };
 
 export function metricas(extra = {}) {
   return {
@@ -69,8 +76,8 @@ export function metricas(extra = {}) {
 }
 
 /** Gera token de instalação pela API e registra um agente. */
-export async function registrarAgente(app, c, info = INFO) {
-  const { json: tok } = await c.post('/api/tokens-instalacao', { descricao: 'teste' });
+export async function registrarAgente(app, c, info = INFO, { site_id } = {}) {
+  const { json: tok } = await c.post('/api/tokens-instalacao', { descricao: 'teste', ...(site_id ? { site_id } : {}) });
   const r = await app.inject({ method: 'POST', url: '/api/agente/registrar', payload: { token: tok.token, info } });
   const { id, segredo } = r.json();
   const auth = { authorization: `Bearer ${id}:${segredo}` };
