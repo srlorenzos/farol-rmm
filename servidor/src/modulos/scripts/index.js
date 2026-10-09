@@ -28,7 +28,7 @@ export const scriptSchema = {
     descricao: { type: 'string', maxLength: 1000 },
     shell: { type: 'string', enum: SHELLS },
     conteudo: { type: 'string', minLength: 1, maxLength: 200_000 },
-    timeout: { type: 'integer', minimum: 5, maximum: 3600 },
+    timeout: { type: 'integer', minimum: 5, maximum: 86400 },
     categoria: { type: 'string', maxLength: 80 },
     so: { type: 'array', maxItems: 3, uniqueItems: true, items: { type: 'string', enum: SOS } },
     tipo: { type: 'string', enum: ['acao', 'monitor', 'auditoria'] },

@@ -116,7 +116,7 @@ export default {
           biblioteca_id: { type: 'string', pattern: '^[a-z0-9][a-z0-9-]{0,79}$' },
           comando: { type: 'string', minLength: 1, maxLength: 20_000 },
           shell: { type: 'string', enum: SHELLS },
-          timeout: { type: 'integer', minimum: 5, maximum: 3600 },
+          timeout: { type: 'integer', minimum: 5, maximum: 86400 },
           variaveis: { type: 'object', maxProperties: 30, additionalProperties: { type: ['string', 'number', 'boolean', 'null'] } },
         },
       } },

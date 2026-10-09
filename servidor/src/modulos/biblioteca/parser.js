@@ -151,7 +151,7 @@ export function parseScript(texto, { extensao, idArquivo, categoriaSlug, arquivo
   const tipo = y.tipo ?? 'acao';
   if (!TIPOS.includes(tipo)) throw new ErroBiblioteca(`tipo inválido "${tipo}" (${TIPOS.join(', ')})`);
   const tempo = y.tempo_limite ?? 60;
-  if (!Number.isInteger(tempo) || tempo < 5 || tempo > 3600) throw new ErroBiblioteca('tempo_limite deve ser um inteiro entre 5 e 3600');
+  if (!Number.isInteger(tempo) || tempo < 5 || tempo > 86400) throw new ErroBiblioteca("tempo_limite deve ser um inteiro entre 5 e 86400 (24 h)");
   let variaveis;
   try { variaveis = normalizarDefinicoes(y.variaveis); } catch (e) { throw new ErroBiblioteca(e.message); }
   if (!corpo.trim()) throw new ErroBiblioteca('o script está vazio depois do cabeçalho');
