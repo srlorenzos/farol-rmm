@@ -1,0 +1,19 @@
+/* =============================================================================
+   Farol — utilitários (camada 5 de 5). Poucos e previsíveis; preferir componentes.
+   ============================================================================= */
+.muted { color: var(--texto-2); }
+.sutil { color: var(--texto-3); }
+.pequeno { font-size: var(--t-12); }
+.mono { font-family: var(--fonte-mono); font-size: 0.92em; }
+.forte { font-weight: var(--peso-forte); }
+.centro { text-align: center; }
+.direita { text-align: right; }
+.nowrap { white-space: nowrap; }
+.truncar { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.quebra { overflow-wrap: anywhere; }
+.cresce { flex: 1; min-width: 0; }
+.mt-1 { margin-top: var(--e-1); } .mt-2 { margin-top: var(--e-2); } .mt-3 { margin-top: var(--e-3); } .mt-4 { margin-top: var(--e-4); } .mt-6 { margin-top: var(--e-6); }
+.mb-2 { margin-bottom: var(--e-2); } .mb-3 { margin-bottom: var(--e-3); } .mb-4 { margin-bottom: var(--e-4); }
+.gap-1 { gap: var(--e-1) !important; } .gap-3 { gap: var(--e-3) !important; } .gap-4 { gap: var(--e-4) !important; }
+.texto-ok { color: var(--ok); } .texto-aviso { color: var(--aviso); } .texto-critico { color: var(--critico); } .texto-marca { color: var(--marca); }
+.largura-total { width: 100%; }
