@@ -63,6 +63,8 @@ O agente sempre **puxa** o trabalho: os jobs pendentes vão na resposta do check
 
 ## Início rápido
 
+**Windows, jeito mais simples:** dê dois cliques em [`iniciar-farol.cmd`](iniciar-farol.cmd). Ele instala as dependências na primeira vez, sobe o servidor, inicia o agente (se este PC já estiver registrado) e abre o painel em http://127.0.0.1:8420. Se o PowerShell disser que "a execução de scripts foi desabilitada", use `npm.cmd` no lugar de `npm` nos comandos abaixo.
+
 ### Servidor
 
 Requer Node.js 22.13 ou mais novo.
