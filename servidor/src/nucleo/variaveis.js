@@ -27,7 +27,7 @@ export function normalizarDefinicoes(lista) {
     const def = {
       nome, tipo,
       rotulo: String(v.rotulo ?? nome).slice(0, 200),
-      padrao: v.padrao ?? null,
+      padrao: v.padrao === '' ? null : (v.padrao ?? null),
       obrigatorio: v.obrigatorio === true,
       opcoes,
     };
