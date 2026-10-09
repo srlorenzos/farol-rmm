@@ -14,7 +14,7 @@ const SOBRA = 8;
  * @param {boolean} [o.selecionavel]
  * @param {(sel: Set) => void} [o.aoSelecionar]
  * @param {(l) => {chave, rotulo}|null} [o.agrupar]
- * @param {(l) => void} [o.aoAbrir]               Enter ou duplo clique
+ * @param {(l) => void} [o.aoAbrir]               Enter ou duplo clique (ou clique simples com abrirComClique)
  * @param {(l, selecionadas) => Array} [o.menu]   itens do menu de contexto
  * @param {() => Node} [o.vazio]
  * @param {{coluna, direcao: 'asc'|'desc'}} [o.ordem]
@@ -173,6 +173,7 @@ export function tabelaVirtual(o) {
       if (ev.target.closest('a, button, input, select')) return;
       if (o.selecionavel && (ev.shiftKey || ev.ctrlKey || ev.metaKey)) { alternarLinha(i, ev.shiftKey); return; }
       focar(i);
+      if (o.abrirComClique) o.aoAbrir?.(l);
     });
     linha.addEventListener('dblclick', (ev) => { if (!ev.target.closest('a, button, input')) o.aoAbrir?.(l); });
     return linha;

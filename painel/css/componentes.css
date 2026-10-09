@@ -52,6 +52,8 @@ svg.icone { width: var(--tam-icone, 18px); height: var(--tam-icone, 18px); }
 .btn-pequeno .icone { --tam-icone: 14px; }
 .btn-grande { --btn-altura: 40px; padding: 0 var(--e-5); font-size: var(--t-14); }
 .btn-largo { width: 100%; }
+.btn.btn-ativo, .btn[aria-pressed="true"] { background: var(--marca-lavagem); border-color: color-mix(in srgb, var(--marca) 50%, transparent); color: var(--texto-1); }
+.btn.btn-ativo .icone, .btn[aria-pressed="true"] .icone { color: var(--marca); }
 .btn .btn-selo { margin-left: 2px; padding: 0 6px; border-radius: var(--raio-pilula); background: var(--superficie-0); color: var(--texto-3); font-size: var(--t-11); line-height: 18px; }
 .btn.carregando { color: transparent !important; pointer-events: none; }
 .btn.carregando > * { visibility: hidden; }
