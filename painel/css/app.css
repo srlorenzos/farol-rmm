@@ -375,7 +375,8 @@ a.cartao-numero:hover { border-color: var(--borda-forte); transform: translateY(
 .item-uso-nome { display: grid; min-width: 0; }
 .item-uso-nome .muted { font-size: 0.8rem; }
 .item-uso-barras { display: flex; gap: 14px; flex-wrap: wrap; }
-@media (max-width: 1280px) and (min-width: 1021px), (max-width: 640px) { .item-uso { grid-template-columns: 1fr; } }
+.lista-uso { container-type: inline-size; }
+@container (max-width: 640px) { .item-uso { grid-template-columns: 1fr; } }
 .mini-rotulo { font-size: 0.72rem; font-weight: 600; color: var(--muted); min-width: 30px; }
 .item-exec { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--borda); }
 .item-exec:last-child { border-bottom: 0; }
