@@ -82,7 +82,52 @@ Depois de entrar, vá em **Configurações** e ative o 2FA: o painel mostra a ch
 
 Configuração por variáveis de ambiente ou `servidor/.env` (veja [`servidor/.env.exemplo`](servidor/.env.exemplo)): `PORT`, `HOST` (padrão `127.0.0.1`), `DB` (padrão `dados/farol.db`), `URL_PUBLICA`, `WEBHOOK_URL`, `SESSAO_HORAS`.
 
-### Agente
+### Instaladores para Windows (.exe)
+
+Sem Python na máquina do cliente. Os arquivos saem do GitHub Release (`releases/latest/download/<nome>`) ou do build local (`empacotamento\dist
+elease\`):
+
+| Arquivo | Para quê |
+|---|---|
+| `FarolAgenteSetup.exe` | Instalador com assistente (pede URL do servidor e token). É o que o técnico manda ao cliente; aparece em "Aplicativos instalados" com desinstalador. |
+| `farol-agente.exe` | Agente em arquivo único, com `instalar`, `desinstalar` e `status`. |
+| `farol-bandeja.exe` | Ícone da bandeja (sem console). |
+| `farol-servidor.exe` | O servidor inteiro num executável, para hospedar no Windows. |
+| `SHA256SUMS.txt` | Somas SHA-256 para conferir os downloads. |
+
+**Instalação interativa:** execute `FarolAgenteSetup.exe`, informe a URL e o token do painel (Dispositivos, Adicionar agente). O Setup copia tudo para `C:\Program Files\Farol`, registra o serviço **Farol RMM Agent** (início automático, reinício em falha), registra a bandeja para iniciar com todos os usuários e inicia os dois.
+
+**Implantação em massa (GPO, Intune, RMM):**
+
+```powershell
+FarolAgenteSetup.exe /VERYSILENT /SUPPRESSMSGBOXES /SERVIDOR=https://farol.exemplo.com.br /TOKEN=<TOKEN> /LOG=setup.log
+```
+
+O token vale uma vez só e por 24 h: para muitas máquinas, gere um por máquina (ou um por lote, dentro da validade e usando a API). Sem `/TOKEN`, o Setup só atualiza uma instalação existente e mantém a configuração. O painel já mostra esse comando na aba "Windows (Setup.exe)" do diálogo de novo dispositivo; troque a origem do download com a variável `FAROL_SETUP_URL` no servidor, se hospedar o Setup em outro lugar.
+
+**Sem o Setup**, direto pelo exe (pede elevação via UAC sozinho):
+
+```powershell
+.\farol-agente.exe instalar --servidor https://farol.exemplo.com.br --token <TOKEN>
+.\farol-agente.exe status
+.\farol-agente.exe desinstalar                  # pergunta se apaga %ProgramData%\Farol
+.\farol-agente.exe desinstalar --manter-config  # remove tudo menos a configuração
+```
+
+O serviço é um serviço Windows de verdade, hospedado pelo próprio agente via pywin32. Isso exige o build em pasta (o que o Setup instala); o `farol-agente.exe` de arquivo único usa como plano B uma Tarefa Agendada como SYSTEM na inicialização, com reinício em falha, e informa qual modo usou.
+
+**Servidor em um exe:** `farol-servidor.exe` extrai o painel e a biblioteca para `%ProgramData%\FarolServidor` (ou `FAROL_DADOS`), guarda lá o banco e um `.env` opcional. `farol-servidor.exe criar-admin --usuario U --senha S` cria o administrador; `instalar-tarefa` (como administrador) faz o servidor subir com o Windows. As variáveis `PORT`, `HOST`, `URL_PUBLICA` etc. funcionam como no servidor normal.
+
+**Gerar os instaladores localmente:** Python 3.10+ com `pip install pyinstaller pywin32 psutil pillow`, Node 22+ e Inno Setup 6 (`winget install JRSoftware.InnoSetup`). Como a política de execução costuma bloquear `.ps1`:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File empacotamento\build.ps1            # tudo
+powershell -ExecutionPolicy Bypass -File empacotamento\build.ps1 -PularServidor -PularSetup
+```
+
+O script usa `npm.cmd`. A versão vem de `empacotamento/VERSION` (única fonte: metadados dos exes, Setup e `farol.VERSAO`). O release no GitHub sai pela tag: `git tag v2.1.0 && git push origin v2.1.0` dispara `.github/workflows/release.yml`, que publica os cinco arquivos com nomes fixos. **Assinatura de código** é opcional: com os secrets `CERT_PFX_BASE64` e `CERT_SENHA` o workflow (e o `build.ps1`, com `CERT_PFX`/`CERT_SENHA` no ambiente) assina os exes e o Setup. Sem certificado, o Windows SmartScreen e alguns antivírus podem avisar na primeira execução; confira o SHA-256.
+
+### Agente (com Python)
 
 Requer Python 3.10+ e `psutil` (`pip install -r agente/requirements.txt`, ou `sudo apt install python3-psutil`).
 
@@ -136,7 +181,7 @@ schtasks /Create /TN "Farol Agente" /SC ONSTART /RU SYSTEM /RL HIGHEST /F `
 schtasks /Run /TN "Farol Agente"
 ```
 
-O `psutil` precisa estar instalado para o Python usado pela tarefa (instale como administrador, não com `--user`). Se preferir um serviço de verdade, o [NSSM](https://nssm.cc/) funciona bem: `nssm install FarolAgente "C:\Python312\python.exe" "C:\Program Files\Farol\farol_agente.py rodar"`.
+O `psutil` precisa estar instalado para o Python usado pela tarefa (instale como administrador, não com `--user`). Se não usar o instalador .exe (seção acima, que já cria o serviço), o [NSSM](https://nssm.cc/) funciona bem: `nssm install FarolAgente "C:\Python312\python.exe" "C:\Program Files\Farol\farol_agente.py rodar"`.
 
 **Linux (systemd)** — use o arquivo [`agente/farol-agente.service`](agente/farol-agente.service):
 
@@ -207,7 +252,7 @@ O servidor é testado com `fastify.inject` e banco em memória: hash de senha, v
 
 - Um único administrador por enquanto (o banco já suporta vários usuários, falta a interface e os papéis).
 - Sem acesso remoto interativo: o console é "envia comando, recebe saída".
-- O agente é um script Python, não um binário: a máquina precisa de Python 3.10+ e `psutil`. Comandos PowerShell no Linux só funcionam se o `pwsh` estiver instalado.
+- No Windows o agente tem instalador .exe sem Python; no Linux/macOS ainda é um script Python (3.10+ e `psutil`). Comandos PowerShell no Linux só funcionam se o `pwsh` estiver instalado. Os exes não são assinados enquanto não houver certificado.
 - Jobs ficam na fila até o próximo check-in (até ~15 s de latência).
 - Regras de alerta são globais; não há exceções por máquina nem janelas de manutenção.
 - Histórico de métricas guarda 1 ponto por minuto por 7 dias; SQLite atende bem algumas centenas de agentes, não milhares.
