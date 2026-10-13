@@ -33,6 +33,24 @@ Write-Host "Farol RMM - build da versão $Versao" -ForegroundColor Cyan
 Remove-Item -Recurse -Force $Dist, $Build -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force $Dist, $Build | Out-Null
 
+# ---------- assinatura opcional (só com certificado) ----------
+$pfx = $env:CERT_PFX
+if (-not $pfx -and $env:CERT_PFX_BASE64) {
+  $pfx = Join-Path $Build 'certificado.pfx'
+  [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:CERT_PFX_BASE64))
+}
+$assinar = [bool]($pfx -and $env:CERT_SENHA)
+function Assinar([string[]]$caminhos) {
+  if (-not $assinar) { return }
+  $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" -ErrorAction SilentlyContinue |
+    Sort-Object FullName -Descending | Select-Object -First 1
+  if (-not $signtool) { throw 'signtool.exe não encontrado (instale o Windows SDK).' }
+  foreach ($c in $caminhos | Where-Object { Test-Path $_ }) {
+    & $signtool.FullName sign /f $pfx /p $env:CERT_SENHA /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 $c; Checar "assinatura de $c"
+  }
+}
+if (-not $assinar) { Write-Host 'Sem certificado (CERT_PFX/CERT_PFX_BASE64 + CERT_SENHA): executáveis sem assinatura; o SmartScreen vai avisar.' }
+
 Passo 'Recursos (ícone) e versão'
 & $Python (Join-Path $Emp 'recursos\gerar_recursos.py'); Checar 'gerar_recursos'
 & $Python (Join-Path $Emp 'agente\versao.py') $Build; Checar 'versao.py'
@@ -63,6 +81,9 @@ if (-not $PularServidor) {
   } finally { Pop-Location }
 }
 
+Passo 'Assinatura dos executáveis (se houver certificado)'
+Assinar @((Join-Path $Dist 'onefile\farol-agente.exe'), (Join-Path $Dist 'onedir\farol-agente\farol-agente.exe'), (Join-Path $Dist 'onedir\farol-bandeja.exe'), (Join-Path $Dist 'farol-servidor.exe'))
+
 if (-not $PularSetup) {
   Passo 'Instalador (Inno Setup)'
   $iscc = $env:ISCC
@@ -75,26 +96,7 @@ if (-not $PularSetup) {
   }
   if (-not $iscc) { throw 'Inno Setup não encontrado. Instale com: winget install JRSoftware.InnoSetup (ou use -PularSetup).' }
   & $iscc /Qp "/DVersao=$Versao" "/DOrigem=$(Join-Path $Dist 'onedir')" "/DSaida=$Dist" (Join-Path $Emp 'setup\farol.iss'); Checar 'ISCC'
-}
-
-# ---------- assinatura opcional ----------
-$pfx = $env:CERT_PFX
-if (-not $pfx -and $env:CERT_PFX_BASE64) {
-  $pfx = Join-Path $Build 'certificado.pfx'
-  [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:CERT_PFX_BASE64))
-}
-if ($pfx -and $env:CERT_SENHA) {
-  Passo 'Assinatura de código'
-  $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" -ErrorAction SilentlyContinue |
-    Sort-Object FullName -Descending | Select-Object -First 1
-  if (-not $signtool) { throw 'signtool.exe não encontrado (instale o Windows SDK).' }
-  $alvos = @(Get-ChildItem (Join-Path $Dist 'onefile\farol-agente.exe'), (Join-Path $Dist 'onedir\farol-agente\farol-agente.exe'),
-             (Join-Path $Dist 'onedir\farol-bandeja.exe'), (Join-Path $Dist 'farol-servidor.exe'), (Join-Path $Dist 'FarolAgenteSetup.exe') -ErrorAction SilentlyContinue)
-  foreach ($a in $alvos) {
-    & $signtool.FullName sign /f $pfx /p $env:CERT_SENHA /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 $a.FullName; Checar "assinatura de $($a.Name)"
-  }
-} else {
-  Write-Host 'Sem certificado (CERT_PFX/CERT_PFX_BASE64 + CERT_SENHA): executáveis sem assinatura; o SmartScreen vai avisar.'
+  Assinar @((Join-Path $Dist 'FarolAgenteSetup.exe'))
 }
 
 # ---------- pasta final com os nomes fixos do release ----------

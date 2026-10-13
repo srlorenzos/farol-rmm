@@ -69,9 +69,15 @@ function ehLocal(url) {
   } catch { return false; }
 }
 
+// Onde o instalador do Windows (Inno Setup) é baixado: padrão = último release do GitHub; FAROL_SETUP_URL troca.
+const URL_SETUP = () => process.env.FAROL_SETUP_URL || 'https://github.com/srlorenzos/farol-rmm/releases/latest/download/FarolAgenteSetup.exe';
+
 export function comandosInstalacao(url, token) {
   const inseguro = url.startsWith('http://') && !ehLocal(url) ? ' --inseguro' : '';
   return {
+    // Instalador .exe, silencioso (serve para GPO/Intune/RMM): FarolAgenteSetup.exe /VERYSILENT /SERVIDOR= /TOKEN=
+    windows_setup: `Invoke-WebRequest -UseBasicParsing "${URL_SETUP()}" -OutFile FarolAgenteSetup.exe; `
+      + `Start-Process .\FarolAgenteSetup.exe -Wait -Verb RunAs -ArgumentList '/VERYSILENT','/SERVIDOR=${url}','/TOKEN=${token}'`,
     windows: `Invoke-WebRequest -UseBasicParsing "${url}/download/farol-agente.pyz" -OutFile farol-agente.pyz; `
       + `python -m pip install psutil; python farol-agente.pyz instalar --servidor "${url}" --token "${token}"${inseguro}`,
     linux: `curl -fsSLO "${url}/download/farol-agente.pyz" && `

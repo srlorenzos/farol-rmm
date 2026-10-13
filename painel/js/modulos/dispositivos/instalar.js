@@ -40,7 +40,7 @@ export function adicionarDispositivo() {
 }
 
 function resultado(r) {
-  let so = /win/i.test(navigator.userAgent) ? 'windows' : 'linux';
+  let so = /win/i.test(navigator.userAgent) ? 'windows_setup' : 'linux';
   const area = h('div', { class: 'pilha-2' });
   const desenhar = () => preencher(area,
     h('div', { class: 'linha-entre' }, h('span', { class: 'rotulo', text: so === 'windows' ? 'PowerShell como administrador' : 'Terminal (com sudo)' }),
@@ -51,9 +51,9 @@ function resultado(r) {
     aviso(h('span', {}, h('strong', { text: 'Token criado. ' }), `Ele não será mostrado de novo. Expira ${relativo(r.expira_em)} (${fmtData(r.expira_em)}).`), 'ok'),
     h('div', { class: 'campo' }, h('span', { class: 'rotulo', text: 'Token' }),
       h('div', { class: 'linha' }, h('code', { class: 'token-texto', text: r.token }), botaoCopiar(r.token, 'Copiar token', { toast }))),
-    abas([{ id: 'windows', rotulo: 'Windows', icone: 'windows' }, { id: 'linux', rotulo: 'Linux', icone: 'linux' }], so, (v) => { so = v; desenhar(); }, 'Sistema operacional'),
+    abas([{ id: 'windows_setup', rotulo: 'Windows (Setup.exe)', icone: 'windows' }, { id: 'windows', rotulo: 'Windows (Python)', icone: 'windows' }, { id: 'linux', rotulo: 'Linux', icone: 'linux' }], so, (v) => { so = v; desenhar(); }, 'Sistema operacional'),
     area,
-    h('p', { class: 'ajuda' }, 'Requisitos: Python 3.10+ e o pacote psutil. O agente abre um canal em tempo real com o servidor e aparece na lista em segundos. Para rodar como serviço, veja o README.'));
+    h('p', { class: 'ajuda' }, 'O Setup.exe não precisa de Python (instala o serviço e a bandeja); em massa, use o mesmo comando por GPO/Intune. Variantes Python/Linux: Python 3.10+ e o pacote psutil. O agente abre um canal em tempo real com o servidor e aparece na lista em segundos. Para rodar como serviço, veja o README.'));
 }
 
 function tokensRecentes() {

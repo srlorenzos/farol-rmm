@@ -10,6 +10,7 @@ test('token de instalação: uso único, inválido e expirado', async () => {
   assert.equal(tok.token.length, 43);
   assert.match(tok.comandos.windows, /farol-agente.pyz instalar --servidor/);
   assert.match(tok.comandos.linux, /curl -fsSLO/);
+  assert.match(tok.comandos.windows_setup, /FarolAgenteSetup\.exe.*\/VERYSILENT.*\/SERVIDOR=.*\/TOKEN=/s);
   assert.notEqual(db.prepare('SELECT token_hash FROM tokens_instalacao').get().token_hash, tok.token, 'só hash no banco');
 
   const registrar = (token) => app.inject({ method: 'POST', url: '/api/agente/registrar', payload: { token, info: INFO } });
