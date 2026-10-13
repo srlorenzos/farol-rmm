@@ -49,6 +49,7 @@ export class Relay {
       const s = this.sessoes.get(msg.sessao);
       if (!s || s.agenteId !== agenteId || typeof msg.d !== 'string') return;
       s.bytesAgente += msg.d.length;
+      this.#notificarDados(s, 'agente', msg.d);
       this.#paraPainel(s, { e: 'dados', d: msg.d });
     });
     canalAgentes.aoMensagem('relay.fechar', (msg, agenteId) => {
@@ -60,11 +61,18 @@ export class Relay {
     });
   }
 
-  registrarTipo(tipo, { permissao, elevado = false, descricao = tipo } = {}) {
+  // `aoDados(direcao, sessaoInfo, dados)` é opcional: observador de dados da sessão (ex.: gravação opt-in de
+  // terminal). Não altera o fluxo; exceções são isoladas para não derrubar o relay.
+  registrarTipo(tipo, { permissao, elevado = false, descricao = tipo, aoDados = null } = {}) {
     if (!/^[a-z][a-z0-9-]*$/.test(tipo)) throw new Error(`Tipo de relay inválido "${tipo}"`);
     if (this.tipos.has(tipo)) throw new Error(`Tipo de relay "${tipo}" já registrado`);
     if (!permissao) throw new Error(`Tipo de relay "${tipo}" precisa declarar a permissão exigida`);
-    this.tipos.set(tipo, { permissao, elevado, descricao });
+    this.tipos.set(tipo, { permissao, elevado, descricao, aoDados });
+  }
+
+  #notificarDados(s, direcao, dados) {
+    if (!s.aoDados) return;
+    try { s.aoDados(direcao, { id: s.id, agenteId: s.agenteId, hostname: s.hostname, tipo: s.tipo, usuario: s.usuario }, dados); } catch (e) { this.ctx.log?.error?.(e); }
   }
 
   abrir(conexao, sessao, msg) {
@@ -87,7 +95,7 @@ export class Relay {
     const id = randomUUID();
     const agora = Date.now();
     const s = { id, ref, agenteId: agente.id, hostname: agente.hostname, tipo: msg.tipo, conexao, usuario: sessao.usuario,
-      abertaEm: agora, bytesPainel: 0, bytesAgente: 0, estado: 'abrindo', timer: null };
+      abertaEm: agora, bytesPainel: 0, bytesAgente: 0, estado: 'abrindo', timer: null, aoDados: def.aoDados };
     this.sessoes.set(id, s);
     this.ctx.db.prepare('INSERT INTO relay_sessoes (id, agente_id, tipo, usuario, ip, aberta_em) VALUES (?, ?, ?, ?, ?, ?)')
       .run(id, agente.id, msg.tipo, sessao.usuario, conexao.ip ?? null, agora);
@@ -105,6 +113,7 @@ export class Relay {
     if (!s || s.conexao !== conexao || s.estado !== 'aberta') return;
     if (typeof msg.d !== 'string' || msg.d.length > MAX_DADOS) return;
     s.bytesPainel += msg.d.length;
+    this.#notificarDados(s, 'painel', msg.d);
     this.ctx.canalAgentes.enviar(s.agenteId, { t: 'relay.dados', sessao: s.id, d: msg.d });
   }
 
