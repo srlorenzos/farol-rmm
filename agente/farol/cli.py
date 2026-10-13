@@ -68,6 +68,35 @@ def coletar_extras(ctx, agora: float) -> dict:
 
 
 def cmd_instalar(args) -> int:
+    """No exe do Windows (ou com --completo) instala de verdade; fora disso só registra no servidor."""
+    if args.completo or (sys.platform == "win32" and getattr(sys, "frozen", False) and not args.so_registrar):
+        from . import instalacao
+        return instalacao.instalar_completo(args, registrar_agente)
+    if not args.servidor or not args.token:
+        log.error("informe --servidor e --token")
+        return 2
+    return registrar_agente(args)
+
+
+def cmd_desinstalar(args) -> int:
+    from . import instalacao
+    return instalacao.desinstalar_completo(args)
+
+
+def cmd_status(args) -> int:
+    from . import instalacao
+    return instalacao.status_completo(args)
+
+
+def cmd_servico(_args) -> int:
+    from . import servico_windows
+    return servico_windows.executar()
+
+
+def registrar_agente(args) -> int:
+    if not args.servidor or not args.token:
+        log.error("informe --servidor e --token")
+        return 2
     servidor = validar_url_servidor(args.servidor, args.inseguro)
     caminho = Path(args.config) if args.config else caminho_config_padrao()
     cliente = Cliente(servidor)
@@ -91,9 +120,10 @@ def cmd_instalar(args) -> int:
         "intervalo": int(resp.get("intervalo") or 15),
         "inseguro": bool(args.inseguro),
     })
-    exe = Path(sys.argv[0]).name or "farol-agente.pyz"
-    print(f"Agente registrado: {resp['id']}\nConfiguração salva em {caminho}\nAgora rode: python {exe} rodar"
-          + (f" --config \"{caminho}\"" if args.config else ""))
+    print(f"Agente registrado: {resp['id']}\nConfiguração salva em {caminho}")
+    if not (args.completo or getattr(sys, "frozen", False)):
+        exe = Path(sys.argv[0]).name or "farol-agente.pyz"
+        print(f"Agora rode: python {exe} rodar" + (f" --config \"{caminho}\"" if args.config else ""))
     return 0
 
 
@@ -130,8 +160,10 @@ def cmd_rodar(args) -> int:
     descobrir()
     intervalo = int(cfg.get("intervalo") or 15)
     executor = concurrent.futures.ThreadPoolExecutor(max_workers=8, thread_name_prefix="tarefa")
-    parar = threading.Event()
+    parar = getattr(args, "parar", None) or threading.Event()  # o serviço do Windows passa o seu
     acordar = threading.Event()
+    if getattr(args, "parar", None):
+        threading.Thread(target=lambda: (parar.wait(), acordar.set()), daemon=True, name="parada").start()
     for sinal in (signal.SIGINT, signal.SIGTERM):
         try:
             signal.signal(sinal, lambda *_: (parar.set(), acordar.set()))
@@ -220,17 +252,52 @@ def _ajustar_saida() -> None:
             pass
 
 
+def _opcoes_windows(p) -> None:
+    p.add_argument("--nome-servico", help="nome do serviço (padrão FarolAgente; mude só para testes)")
+    p.add_argument("--pasta", help="pasta de instalação (padrão C:\\Program Files\\Farol)")
+    p.add_argument("--silencioso", action="store_true", help="sem perguntas nem pausa no fim")
+    p.add_argument("--elevado", action="store_true", help=argparse.SUPPRESS)
+
+
+def _sem_argumentos(p) -> int:
+    """Duplo clique no exe: mostra a ajuda e espera, em vez de a janela sumir."""
+    p.print_help()
+    print("\nPara instalar neste computador: farol-agente.exe instalar --servidor URL --token TOKEN")
+    try:
+        input("\nPressione Enter para fechar...")
+    except (EOFError, OSError):
+        pass
+    return 0
+
+
 def main(argv=None) -> int:
     _ajustar_saida()
     p = argparse.ArgumentParser(prog="farol-agente", description="Agente do Farol RMM")
     p.add_argument("-v", "--verbose", action="store_true", help="log detalhado")
     sub = p.add_subparsers(dest="comando", required=True)
 
-    pi = sub.add_parser("instalar", help="registra este computador no servidor")
-    pi.add_argument("--servidor", required=True, help="URL do servidor, ex.: https://farol.exemplo.com")
-    pi.add_argument("--token", required=True, help="token de instalação gerado no painel")
+    pi = sub.add_parser("instalar", help="registra este computador no servidor (no exe do Windows: instala tudo)")
+    pi.add_argument("--servidor", help="URL do servidor, ex.: https://farol.exemplo.com")
+    pi.add_argument("--token", help="token de instalação gerado no painel (sem ele, só atualiza uma instalação existente)")
     pi.add_argument("--config", help="caminho do arquivo de configuração")
     pi.add_argument("--inseguro", action="store_true", help="permite http:// para hosts que não são localhost")
+    _opcoes_windows(pi)
+    pi.add_argument("--completo", action="store_true", help="força a instalação completa (Windows) fora do exe")
+    pi.add_argument("--so-registrar", action="store_true", help="só registra no servidor, sem instalar serviço")
+    pi.add_argument("--modo", choices=["servico", "tarefa"], help="força serviço do Windows ou tarefa agendada")
+
+    pd = sub.add_parser("desinstalar", help="remove serviço, autostart, arquivos e (com confirmação) a configuração")
+    pd.add_argument("--config", help="caminho do arquivo de configuração")
+    _opcoes_windows(pd)
+    pd.add_argument("--manter-config", action="store_true", help="não apaga %%ProgramData%%\Farol")
+    pd.add_argument("--remover-config", action="store_true", help="apaga %%ProgramData%%\Farol sem perguntar")
+    pd.add_argument("--sem-arquivos", action="store_true", help=argparse.SUPPRESS)
+
+    ps = sub.add_parser("status", help="mostra o estado da instalação (serviço, bandeja, configuração)")
+    ps.add_argument("--config", help="caminho do arquivo de configuração")
+    _opcoes_windows(ps)
+
+    sub.add_parser("servico", help=argparse.SUPPRESS)  # chamado pelo gerenciador de serviços do Windows
 
     pr = sub.add_parser("rodar", help="loop principal de check-in")
     pr.add_argument("--config", help="caminho do arquivo de configuração")
@@ -240,6 +307,8 @@ def main(argv=None) -> int:
     sub.add_parser("versao", help="mostra a versão")
     sub.add_parser("modulos", help="lista módulos, comandos e sessões disponíveis")
 
+    if argv is None and len(sys.argv) == 1 and getattr(sys, "frozen", False):
+        return _sem_argumentos(p)
     args = p.parse_args(argv)
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO,
                         format="%(asctime)s %(levelname)s %(message)s")
@@ -248,6 +317,12 @@ def main(argv=None) -> int:
             return cmd_instalar(args)
         if args.comando == "rodar":
             return cmd_rodar(args)
+        if args.comando == "desinstalar":
+            return cmd_desinstalar(args)
+        if args.comando == "status":
+            return cmd_status(args)
+        if args.comando == "servico":
+            return cmd_servico(args)
         if args.comando == "modulos":
             return cmd_modulos(args)
         print(VERSAO)
