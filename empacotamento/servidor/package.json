@@ -1,0 +1,15 @@
+{
+  "name": "farol-servidor-empacotamento",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Empacota o servidor do Farol como executável único (Node SEA). As dependências de build ficam aqui, não no servidor.",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "postject": "^1.0.0-alpha.6",
+    "rcedit": "^4.0.1"
+  }
+}
