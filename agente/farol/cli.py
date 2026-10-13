@@ -289,8 +289,8 @@ def main(argv=None) -> int:
     pd = sub.add_parser("desinstalar", help="remove serviço, autostart, arquivos e (com confirmação) a configuração")
     pd.add_argument("--config", help="caminho do arquivo de configuração")
     _opcoes_windows(pd)
-    pd.add_argument("--manter-config", action="store_true", help="não apaga %%ProgramData%%\Farol")
-    pd.add_argument("--remover-config", action="store_true", help="apaga %%ProgramData%%\Farol sem perguntar")
+    pd.add_argument("--manter-config", action="store_true", help="não apaga %%ProgramData%%\\Farol")
+    pd.add_argument("--remover-config", action="store_true", help="apaga %%ProgramData%%\\Farol sem perguntar")
     pd.add_argument("--sem-arquivos", action="store_true", help=argparse.SUPPRESS)
 
     ps = sub.add_parser("status", help="mostra o estado da instalação (serviço, bandeja, configuração)")
