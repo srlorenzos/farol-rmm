@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sua licença do Farol RMM</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#081217">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<script src="/js/tema.js"></script>
+<link rel="stylesheet" href="/css/site.css">
+</head>
+<body>
+<svg width="0" height="0" class="so-leitor" aria-hidden="true" focusable="false">
+  <defs>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+    <symbol id="i-baixar" viewBox="0 0 24 24"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></symbol>
+    <symbol id="i-copiar" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 012-2h9"/></symbol>
+    <symbol id="i-giro" viewBox="0 0 24 24"><path d="M12 3a9 9 0 109 9"/></symbol>
+    <symbol id="i-sol" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4 12H2M22 12h-2M5 5l1.4 1.4M17.6 17.6L19 19M5 19l1.4-1.4M17.6 6.4L19 5"/></symbol>
+    <symbol id="i-lua" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 019.5 4 8 8 0 1020 14.5z"/></symbol>
+  </defs>
+</svg>
+<header class="topo">
+  <div class="contem topo-int">
+    <a class="marca" href="/" aria-label="Farol RMM, início"><img src="/favicon.svg" width="30" height="30" alt="">Farol RMM</a>
+    <div class="topo-acoes">
+      <button class="btn btn-icone btn-fantasma" type="button" data-tema aria-label="Alternar entre tema escuro e claro"><svg class="ico tema-sol" aria-hidden="true"><use href="#i-sol"/></svg><svg class="ico tema-lua" aria-hidden="true"><use href="#i-lua"/></svg></button>
+      <a class="btn btn-topo" href="/">Voltar ao site</a>
+    </div>
+  </div>
+</header>
+
+<main class="pagina" id="conteudo">
+  <div class="contem pagina-estreita">
+    <div class="cartao-sucesso" id="cartao" aria-live="polite">
+      <span class="estado-ico espera" id="estado-ico"><svg class="ico giro" aria-hidden="true"><use href="#i-giro"/></svg></span>
+      <h1 id="titulo">Confirmando o pagamento...</h1>
+      <p id="texto" class="hero-sub-pagina">Estamos aguardando a confirmação do Stripe. Isso costuma levar poucos segundos. Não feche esta página.</p>
+      <div id="licenca" hidden>
+        <dl class="resumo-lic" id="resumo"></dl>
+        <div class="chave" id="chave" tabindex="0" aria-label="Chave de licença"></div>
+        <div class="botoes">
+          <button class="btn btn-primario" type="button" id="copiar"><svg class="ico" aria-hidden="true"><use href="#i-copiar"/></svg><span>Copiar chave</span></button>
+          <button class="btn" type="button" id="baixar"><svg class="ico" aria-hidden="true"><use href="#i-baixar"/></svg>Baixar como arquivo</button>
+        </div>
+        <section class="texto" aria-labelledby="como">
+          <h2 id="como">Como ativar</h2>
+          <ul>
+            <li>Abra o painel do seu servidor Farol e entre como administrador.</li>
+            <li>Vá em <strong>Configurações</strong>, depois <strong>Licença</strong>.</li>
+            <li>Cole a chave e clique em <strong>Instalar chave</strong>. A validação é feita no seu servidor, sem internet.</li>
+            <li>Guarde esta página: ela sempre mostra a chave mais recente da sua assinatura, inclusive depois das renovações.</li>
+          </ul>
+        </section>
+      </div>
+    </div>
+  </div>
+</main>
+<script type="module" src="/js/sucesso.js"></script>
+</body>
+</html>

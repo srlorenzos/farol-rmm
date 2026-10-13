@@ -1,0 +1,427 @@
+<!doctype html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Farol RMM: monitoramento e suporte remoto para MSPs</title>
+<meta name="description" content="Monitore, automatize e dê suporte a todos os computadores dos seus clientes, de um só lugar. RMM auto-hospedado, 551 scripts prontos, alertas e chamados. Grátis até 5 dispositivos.">
+<meta name="theme-color" content="#081217">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="canonical" href="https://farol-rmm.vercel.app/">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="pt_BR">
+<meta property="og:site_name" content="Farol RMM">
+<meta property="og:title" content="Farol RMM: monitore, automatize e dê suporte a todos os seus clientes">
+<meta property="og:description" content="RMM auto-hospedado com 551 scripts prontos, alertas e chamados. Cobrança por dispositivo, sem contrato. Grátis até 5 dispositivos.">
+<meta property="og:url" content="https://farol-rmm.vercel.app/">
+<meta property="og:image" content="https://farol-rmm.vercel.app/img/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Painel do Farol RMM com a visão geral da frota de dispositivos">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://farol-rmm.vercel.app/img/og.png">
+<script src="/js/tema.js"></script>
+<link rel="stylesheet" href="/css/site.css">
+<link rel="preload" as="image" href="/img/painel-visao-geral.webp" type="image/webp" fetchpriority="high">
+</head>
+<body>
+<svg width="0" height="0" class="so-leitor" aria-hidden="true" focusable="false">
+  <defs>
+    <symbol id="i-pulso" viewBox="0 0 24 24"><path d="M3 12h4l2-5 4 10 2-5h6"/></symbol>
+    <symbol id="i-script" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9l3 3-3 3M12 15h5"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0112 0c0 7 3 8 3 8H3s3-1 3-8M10 20a2 2 0 004 0"/></symbol>
+    <symbol id="i-suporte" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5"/><path d="M5.6 5.6l3.9 3.9M14.5 14.5l3.9 3.9M18.4 5.6l-3.9 3.9M9.5 14.5l-3.9 3.9"/></symbol>
+    <symbol id="i-predio" viewBox="0 0 24 24"><path d="M4 21V5a1 1 0 011-1h8a1 1 0 011 1v16M14 9h5a1 1 0 011 1v11M3 21h18M8 8h2M8 12h2M8 16h2"/></symbol>
+    <symbol id="i-escudo" viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/></symbol>
+    <symbol id="i-caixa" viewBox="0 0 24 24"><path d="M3 7l9-4 9 4v10l-9 4-9-4z"/><path d="M3 7l9 4 9-4M12 11v10"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+    <symbol id="i-baixar" viewBox="0 0 24 24"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></symbol>
+    <symbol id="i-servidor" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><path d="M7 7h.01M7 17h.01"/></symbol>
+    <symbol id="i-monitor" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></symbol>
+    <symbol id="i-seta-baixo" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+    <symbol id="i-sol" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4 12H2M22 12h-2M5 5l1.4 1.4M17.6 17.6L19 19M5 19l1.4-1.4M17.6 6.4L19 5"/></symbol>
+    <symbol id="i-lua" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 019.5 4 8 8 0 1020 14.5z"/></symbol>
+    <symbol id="i-copiar" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 012-2h9"/></symbol>
+    <symbol id="i-seta" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+    <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+    <symbol id="i-cadeado" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></symbol>
+    <symbol id="i-mail" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></symbol>
+  </defs>
+</svg>
+<a class="pular" href="#conteudo">Pular para o conteúdo</a>
+
+<header class="topo">
+  <div class="contem topo-int">
+    <a class="marca" href="/" aria-label="Farol RMM, início"><img src="/favicon.svg" width="30" height="30" alt="">Farol RMM</a>
+    <nav class="nav" aria-label="Principal">
+      <a href="#recursos">Recursos</a>
+      <a href="#como-funciona">Como funciona</a>
+      <a href="#comparativo">Comparativo</a>
+      <a href="#precos">Preços</a>
+      <a href="#baixar">Baixar</a>
+      <a href="#faq">Dúvidas</a>
+    </nav>
+    <div class="topo-acoes">
+      <button class="btn btn-icone btn-fantasma" type="button" data-tema aria-label="Alternar entre tema escuro e claro">
+        <svg class="ico tema-sol" aria-hidden="true"><use href="#i-sol"/></svg><svg class="ico tema-lua" aria-hidden="true"><use href="#i-lua"/></svg>
+      </button>
+      <a class="btn btn-topo btn-topo-sec" href="#precos">Preços</a>
+      <a class="btn btn-primario btn-topo" href="#baixar">Baixar grátis</a>
+      <button class="btn btn-icone btn-fantasma menu-botao" type="button" aria-expanded="false" aria-controls="menu-movel" data-menu aria-label="Abrir menu">
+        <svg class="ico" aria-hidden="true"><use href="#i-menu"/></svg>
+      </button>
+    </div>
+  </div>
+  <nav class="menu-movel" id="menu-movel" aria-label="Menu">
+    <a href="#recursos">Recursos</a><a href="#como-funciona">Como funciona</a><a href="#comparativo">Comparativo</a><a href="#precos">Preços</a><a href="#baixar">Baixar</a><a href="#faq">Dúvidas</a>
+  </nav>
+</header>
+
+<main id="conteudo">
+  <section class="hero" aria-labelledby="titulo-hero">
+    <div class="contem">
+      <p class="selo-hero"><b>Novo</b> Chamados direto da bandeja do Windows</p>
+      <h1 id="titulo-hero">Todos os computadores dos seus clientes, <em>sob o seu farol</em></h1>
+      <p class="hero-sub">Monitore, automatize e dê suporte a todos os computadores dos seus clientes, de um só lugar. Instale no seu servidor, pague só por dispositivo e mantenha os dados com você.</p>
+      <div class="hero-cta">
+        <a class="btn btn-primario btn-grande" href="#baixar">Baixar grátis <svg class="ico" aria-hidden="true"><use href="#i-baixar"/></svg></a>
+        <a class="btn btn-grande" href="#precos">Ver planos e preços</a>
+      </div>
+      <p class="hero-nota"><span>Grátis até 5 dispositivos</span><span>Sem cartão</span><span>Sem contrato</span></p>
+
+      <div class="hero-vitrine">
+        <div class="janela">
+          <div class="janela-barra" aria-hidden="true"><i></i><i></i><i></i><span class="janela-url">farol.suaempresa.com.br</span></div>
+          <img class="so-escuro" src="/img/painel-visao-geral.webp" width="1440" height="900" alt="Painel do Farol com o estado da frota, alertas por severidade, saúde de disco e as máquinas com maior uso de recursos" fetchpriority="high">
+          <img class="so-claro" src="/img/painel-claro.webp" width="1440" height="900" alt="Painel do Farol no tema claro" loading="lazy">
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="faixa">
+    <div class="contem">
+      <ul>
+        <li><b>551</b><span>scripts prontos e revisados</span></li>
+        <li><b>15 s</b><span>entre check-ins dos agentes</span></li>
+        <li><b>2FA</b><span>obrigatório para executar ações</span></li>
+        <li><b>R$ 0</b><span>até 5 dispositivos, sem prazo</span></li>
+      </ul>
+    </div>
+  </div>
+
+  <section class="secao" id="recursos" aria-labelledby="t-recursos">
+    <div class="contem">
+      <header class="cabeca revelar">
+        <p class="sobretitulo">Recursos</p>
+        <h2 id="t-recursos">Tudo o que um MSP precisa para cuidar da frota</h2>
+        <p>Um painel só para ver o que está acontecendo, agir em um ou em centenas de computadores e provar o que foi feito.</p>
+      </header>
+      <div class="recursos">
+        <article class="rec rec-largo revelar">
+          <span class="rec-ico"><svg class="ico" aria-hidden="true"><use href="#i-pulso"/></svg></span>
+          <h3>Monitoramento em tempo real</h3>
+          <p>CPU, memória, discos, tempo ligado, usuário logado e IP de cada máquina, atualizados ao vivo por um canal em tempo real. Gráficos de 1 hora, 24 horas e 7 dias.</p>
+          <div class="rec-img"><img src="/img/painel-detalhe.webp" width="1440" height="900" loading="lazy" alt="Detalhe de um dispositivo com saúde atual, sistema, agente, volumes e rede"></div>
+        </article>
+        <article class="rec rec-medio rec-largo revelar">
+          <span class="rec-ico"><svg class="ico" aria-hidden="true"><use href="#i-script"/></svg></span>
+          <h3>551 scripts prontos</h3>
+          <p>Biblioteca em 31 categorias para Windows, Linux e macOS: limpeza, BitLocker, firewall, impressoras, Active Directory, auditorias e 88 monitores. As variáveis viram formulário e você pode escrever os seus.</p>
+          <div class="rec-img"><img src="/img/painel-biblioteca.webp" width="1440" height="900" loading="lazy" alt="Biblioteca de scripts com categorias, filtros por sistema e tipo, e a lista de scripts"></div>
+        </article>
+        <article class="rec revelar">
+          <span class="rec-ico"><svg class="ico" aria-hidden="true"><use href="#i-bell"/></svg></span>
+          <h3>Automação e alertas</h3>
+          <p>Regras de CPU, memória, disco e dispositivo offline, com severidade. Os alertas abrem e se resolvem sozinhos e podem chamar o seu Discord, Slack ou ntfy.</p>
+        </article>
+        <article class="rec revelar">
+          <span class="rec-ico"><svg class="ico" aria-hidden="true"><use href="#i-suporte"/></svg></span>
+          <h3>Suporte na bandeja, com chamados</h3>
+          <p>Um ícone do Farol na bandeja do Windows deixa o usuário abrir um chamado em segundos. Ele chega ao seu painel com o dispositivo e o contexto da máquina.</p>
+        </article>
+        <article class="rec revelar">
+          <span class="rec-ico"><svg class="ico" aria-hidden="true"><use href="#i-predio"/></svg></span>
+          <h3>Multi-cliente e sites</h3>
+          <p>Organize por cliente e por site, filtre o painel inteiro pelo seletor do topo e dê a cada técnico só o acesso de que ele precisa: administrador, técnico ou somente leitura.</p>
+        </article>
+        <article class="rec rec-largo revelar">
+          <span class="rec-ico"><svg class="ico" aria-hidden="true"><use href="#i-escudo"/></svg></span>
+          <h3>Segurança de verdade</h3>
+          <ul>
+            <li><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg>2FA obrigatório e reconfirmação a cada 10 minutos para executar qualquer coisa nas máquinas.</li>
+            <li><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg>Auditoria de logins, scripts executados e mudanças, com usuário, alvo e IP.</li>
+            <li><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg>Auto-hospedado: os dados ficam no seu servidor. O agente só puxa trabalho, então você não abre portas nas máquinas dos clientes.</li>
+          </ul>
+        </article>
+        <article class="rec rec-largo revelar">
+          <span class="rec-ico"><svg class="ico" aria-hidden="true"><use href="#i-caixa"/></svg></span>
+          <h3>Inventário sem planilha</h3>
+          <ul>
+            <li><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg>Fabricante, modelo, número de série, processador, memória e discos de cada dispositivo.</li>
+            <li><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg>Interfaces de rede com MAC e IP, e a lista de softwares instalados, com busca.</li>
+            <li><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg>Atualizado automaticamente a cada hora, sem ninguém precisar lembrar.</li>
+          </ul>
+        </article>
+      </div>
+      <p class="nota-breve">No roteiro: terminal e tela remota, gestão de patches e relatórios. Ainda não estão na versão atual.</p>
+    </div>
+  </section>
+
+  <section class="secao secao-alt" id="como-funciona" aria-labelledby="t-como">
+    <div class="contem">
+      <header class="cabeca revelar">
+        <p class="sobretitulo">Como funciona</p>
+        <h2 id="t-como">Do download ao primeiro dispositivo em minutos</h2>
+      </header>
+      <ol class="passos">
+        <li class="passo revelar"><h3>Instale o servidor</h3><p>Execute o <code>farol-servidor.exe</code> no seu PC ou servidor, abra o painel e crie o administrador. Os dados ficam em um arquivo SQLite com você.</p></li>
+        <li class="passo revelar"><h3>Instale o agente</h3><p>No painel, gere um token de instalação e rode o <code>FarolAgenteSetup.exe</code> no computador do cliente. Em segundos ele aparece online.</p></li>
+        <li class="passo revelar"><h3>Monitore e aja</h3><p>Acompanhe métricas e alertas, rode scripts em um ou vários dispositivos e responda aos chamados que chegam da bandeja.</p></li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="secao" id="comparativo" aria-labelledby="t-comp">
+    <div class="contem">
+      <header class="cabeca revelar">
+        <p class="sobretitulo">Comparativo</p>
+        <h2 id="t-comp">Farol vs. RMMs tradicionais</h2>
+        <p>Por que muita gente troca a assinatura gigante por uma ferramenta simples, sua e com preço previsível.</p>
+      </header>
+      <div class="tabela-rolagem revelar">
+        <table class="comparativo">
+          <caption class="so-leitor">Comparação entre o Farol RMM e RMMs tradicionais</caption>
+          <thead><tr><th scope="col">Critério</th><th scope="col" class="destaque">Farol RMM</th><th scope="col">RMMs tradicionais</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Preço por dispositivo</th><td class="destaque"><span class="sim"><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg>Em reais, de R$ 4,50 a R$ 9,90 por mês</span><small>Grátis até 5 dispositivos</small></td><td><span class="nao"><svg class="ico" aria-hidden="true"><use href="#i-x"/></svg>Costuma ser em dólar, com mínimo de dispositivos</span></td></tr>
+            <tr><th scope="row">Contrato</th><td class="destaque"><span class="sim"><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg>Sem contrato nem fidelidade</span><small>Cancele quando quiser</small></td><td><span class="nao"><svg class="ico" aria-hidden="true"><use href="#i-x"/></svg>Com frequência exige plano anual</span></td></tr>
+            <tr><th scope="row">Auto-hospedado</th><td class="destaque"><span class="sim"><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg>Roda no seu servidor</span></td><td><span class="nao"><svg class="ico" aria-hidden="true"><use href="#i-x"/></svg>Normalmente só na nuvem do fornecedor</span></td></tr>
+            <tr><th scope="row">Onde ficam os dados</th><td class="destaque"><span class="sim"><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg>No seu servidor, sob o seu controle</span><small>A licença é validada offline</small></td><td><span class="nao"><svg class="ico" aria-hidden="true"><use href="#i-x"/></svg>Na infraestrutura de terceiros</span></td></tr>
+            <tr><th scope="row">Biblioteca de scripts</th><td class="destaque"><span class="sim"><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg>551 scripts incluídos</span></td><td><span class="nao"><svg class="ico" aria-hidden="true"><use href="#i-x"/></svg>Varia por plano ou é vendida à parte</span></td></tr>
+            <tr><th scope="row">Código</th><td class="destaque"><span class="sim"><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg>Aberto e auditável (licença MIT)</span></td><td><span class="nao"><svg class="ico" aria-hidden="true"><use href="#i-x"/></svg>Fechado</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="aviso-leg">Comparação genérica, baseada em práticas comuns do mercado. Confira as condições de cada fornecedor.</p>
+    </div>
+  </section>
+
+  <section class="secao secao-alt" id="precos" aria-labelledby="t-precos">
+    <div class="contem">
+      <header class="cabeca revelar">
+        <p class="sobretitulo">Planos e preços</p>
+        <h2 id="t-precos">Pague só pelos dispositivos que você gerencia</h2>
+        <p>Todos os planos têm todos os recursos. O que muda é a quantidade de dispositivos.</p>
+      </header>
+      <div class="ciclo-wrap revelar">
+        <div class="ciclo" role="group" aria-label="Periodicidade da cobrança">
+          <button type="button" data-ciclo="mes" aria-pressed="true">Mensal</button>
+          <button type="button" data-ciclo="ano" aria-pressed="false">Anual <span class="desc">-20%</span></button>
+        </div>
+      </div>
+      <div class="planos">
+        <article class="plano revelar">
+          <h3>Grátis</h3>
+          <p class="quem">Para conhecer, para o laboratório e para quem cuida de poucas máquinas.</p>
+          <div class="preco"><strong>R$ 0</strong><span>para sempre</span></div>
+          <p class="preco-sub">Até 5 dispositivos</p>
+          <ul>
+            <li><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg>Todos os recursos do painel</li>
+            <li><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg>551 scripts, alertas e chamados</li>
+            <li><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg>Sem cartão e sem prazo</li>
+            <li><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg>Ajuda pela comunidade no GitHub</li>
+          </ul>
+          <a class="btn btn-bloco" href="#baixar">Baixar grátis</a>
+        </article>
+        <article class="plano plano-top revelar">
+          <span class="etiqueta">Mais escolhido</span>
+          <h3>Profissional</h3>
+          <p class="quem">Para técnicos autônomos e pequenos provedores de TI.</p>
+          <div class="preco"><strong data-preco="pro">R$ 9,90</strong><span>por dispositivo/mês</span></div>
+          <p class="preco-sub" data-sub="pro">De 6 a 50 dispositivos. Cobrança mensal.</p>
+          <ul>
+            <li><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg>Todos os recursos, sem limite de clientes</li>
+            <li><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg>Licença validada offline</li>
+            <li><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg>Atualizações incluídas</li>
+            <li><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg>Suporte por e-mail</li>
+          </ul>
+          <button class="btn btn-primario btn-bloco" type="button" data-plano="25">Calcular e assinar</button>
+        </article>
+        <article class="plano revelar">
+          <h3>MSP</h3>
+          <p class="quem">Para quem gerencia dezenas ou centenas de máquinas, com desconto por volume.</p>
+          <div class="preco"><strong data-preco="msp">R$ 4,50</strong><span>a partir de, por dispositivo/mês</span></div>
+          <p class="preco-sub" data-sub="msp">De 51 a 5.000 dispositivos, em faixas.</p>
+          <ul>
+            <li><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg>Desconto progressivo por faixa</li>
+            <li><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg>Multi-cliente e sites, papéis e auditoria</li>
+            <li><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg>Mais de 5.000? Fale com vendas</li>
+            <li><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg>Suporte por e-mail</li>
+          </ul>
+          <button class="btn btn-bloco" type="button" data-plano="120">Calcular e assinar</button>
+        </article>
+      </div>
+
+      <div class="calc revelar" id="calculadora">
+        <div>
+          <h3>Calculadora</h3>
+          <p class="calc-sub">Arraste ou digite a quantidade de dispositivos. Os 5 primeiros são sempre grátis, também nos planos pagos.</p>
+          <div class="calc-controle">
+            <div class="calc-linha">
+              <label for="qtd-num">Dispositivos</label>
+              <input class="calc-num" id="qtd-num" type="number" inputmode="numeric" min="1" max="5000" value="25" aria-describedby="calc-msg">
+            </div>
+            <input id="qtd-slider" type="range" min="1" max="500" value="25" aria-label="Quantidade de dispositivos">
+            <div class="escala" aria-hidden="true"><span>1</span><span>125</span><span>250</span><span>375</span><span>500</span></div>
+            <p class="calc-msg" id="calc-msg" role="status"></p>
+          </div>
+          <table class="faixas-tab">
+            <caption class="so-leitor">Faixas de preço por dispositivo</caption>
+            <thead><tr><th scope="col">Faixa</th><th scope="col" data-rot-faixa>Por dispositivo/mês</th></tr></thead>
+            <tbody id="faixas"></tbody>
+          </table>
+        </div>
+        <div class="calc-res" aria-live="polite">
+          <p class="calc-plano">Plano <b id="res-plano">Profissional</b></p>
+          <p class="calc-total"><span id="res-total">R$ 0</span> <small id="res-periodo">/mês</small></p>
+          <div class="calc-itens">
+            <div><span>Dispositivos</span><b id="res-qtd">25</b></div>
+            <div><span>Média por dispositivo/mês</span><b id="res-medio">R$ 0</b></div>
+            <div><span id="res-extra-rot">Equivale a</span><b id="res-extra">R$ 0</b></div>
+          </div>
+          <a class="btn btn-primario btn-grande btn-bloco" id="res-cta" href="#baixar">Assinar</a>
+          <p class="aviso-leg" id="res-nota"></p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="secao" id="baixar" aria-labelledby="t-baixar">
+    <div class="contem">
+      <header class="cabeca revelar">
+        <p class="sobretitulo">Baixar e instalar</p>
+        <h2 id="t-baixar">Comece agora, sem falar com ninguém</h2>
+        <p>O servidor funciona sem licença até 5 dispositivos. Quando precisar de mais, instale a chave no painel.</p>
+      </header>
+      <div class="baixar">
+        <article class="dl revelar">
+          <span class="dl-ico"><svg class="ico" aria-hidden="true"><use href="#i-servidor"/></svg></span>
+          <h3>Servidor e painel</h3>
+          <p>Roda no seu PC ou servidor Windows. Inclui a API, o painel web e o banco SQLite embutido.</p>
+          <p class="meta">farol-servidor.exe</p>
+          <a class="btn btn-primario" href="https://github.com/srlorenzos/farol-rmm/releases/latest/download/farol-servidor.exe" rel="noopener"><svg class="ico" aria-hidden="true"><use href="#i-baixar"/></svg>Baixar o servidor</a>
+        </article>
+        <article class="dl revelar">
+          <span class="dl-ico"><svg class="ico" aria-hidden="true"><use href="#i-monitor"/></svg></span>
+          <h3>Agente para Windows</h3>
+          <p>Instalador do agente, com o ícone de suporte na bandeja. Rode nos computadores que você quer monitorar.</p>
+          <p class="meta">FarolAgenteSetup.exe</p>
+          <a class="btn btn-primario" href="https://github.com/srlorenzos/farol-rmm/releases/latest/download/FarolAgenteSetup.exe" rel="noopener"><svg class="ico" aria-hidden="true"><use href="#i-baixar"/></svg>Baixar o agente</a>
+        </article>
+      </div>
+      <div class="doc">
+        <section class="doc-cartao revelar" aria-labelledby="d-servidor">
+          <h3 id="d-servidor">Instalar o servidor</h3>
+          <ol>
+            <li><span>Execute o <code>farol-servidor.exe</code>. Ele sobe o painel em <code>http://127.0.0.1:8420</code>.</span></li>
+            <li><span>Abra o endereço e crie o administrador na tela de primeiro acesso.</span></li>
+            <li><span>Em <strong>Configurações, Minha conta</strong>, ative o 2FA. Ele é exigido para executar ações nas máquinas.</span></li>
+            <li><span>Para atender PCs fora da sua rede, publique o servidor com HTTPS (proxy reverso) e use esse endereço nos agentes.</span></li>
+          </ol>
+        </section>
+        <section class="doc-cartao revelar" aria-labelledby="d-agente">
+          <h3 id="d-agente">Instalar o agente</h3>
+          <ol>
+            <li><span>No painel, abra <strong>Dispositivos, Adicionar dispositivo</strong>. Ele gera um token de uso único, válido por 24 horas.</span></li>
+            <li><span>No computador do cliente, rode o <code>FarolAgenteSetup.exe</code> e informe o endereço do servidor e o token.</span></li>
+            <li><span>O dispositivo aparece como <strong>Online</strong> em segundos. Para Linux, use o comando abaixo.</span></li>
+          </ol>
+          <div class="codigo">
+            <pre><code>python farol_agente.py instalar --servidor https://farol.suaempresa.com.br --token &lt;TOKEN&gt;
+python farol_agente.py rodar</code></pre>
+            <button type="button" data-copiar="python farol_agente.py instalar --servidor https://farol.suaempresa.com.br --token <TOKEN>&#10;python farol_agente.py rodar" aria-label="Copiar comandos"><svg class="ico ico-p" aria-hidden="true"><use href="#i-copiar"/></svg></button>
+          </div>
+        </section>
+      </div>
+      <p class="nota-breve">Código-fonte, histórico de versões e documentação completa em <a href="https://github.com/srlorenzos/farol-rmm" rel="noopener">github.com/srlorenzos/farol-rmm</a>. Para ativar uma licença paga: <strong>Configurações, Licença</strong>, cole a chave.</p>
+    </div>
+  </section>
+
+  <section class="secao secao-alt" id="faq" aria-labelledby="t-faq">
+    <div class="contem">
+      <header class="cabeca revelar">
+        <p class="sobretitulo">Dúvidas frequentes</p>
+        <h2 id="t-faq">Antes de você perguntar</h2>
+      </header>
+      <div class="faq revelar">
+        <details><summary>O plano grátis é grátis mesmo?<svg class="ico" aria-hidden="true"><use href="#i-seta-baixo"/></svg></summary><div class="faq-int"><p>Sim. O servidor funciona sem licença até 5 dispositivos, com todos os recursos e sem prazo. Você só precisa de uma licença para registrar o sexto dispositivo em diante.</p></div></details>
+        <details><summary>Onde ficam os meus dados?<svg class="ico" aria-hidden="true"><use href="#i-seta-baixo"/></svg></summary><div class="faq-int"><p>No servidor que você instala. Métricas, inventário, scripts e auditoria não passam por nós. A licença é verificada dentro do seu servidor, sem consultar a internet.</p></div></details>
+        <details><summary>Preciso abrir portas nos computadores dos clientes?<svg class="ico" aria-hidden="true"><use href="#i-seta-baixo"/></svg></summary><div class="faq-int"><p>Não. O agente é quem conversa com o servidor, então nada abre conexão para dentro das máquinas. Só o servidor precisa estar acessível aos agentes, de preferência por HTTPS.</p></div></details>
+        <details><summary>O que acontece se a minha licença vencer?<svg class="ico" aria-hidden="true"><use href="#i-seta-baixo"/></svg></summary><div class="faq-int"><p>Há uma carência de 7 dias, com aviso no painel. Depois disso o limite volta a ser de 5 dispositivos para novos registros. Os dispositivos que já estão registrados não são desligados nem perdem dados.</p></div></details>
+        <details><summary>Quais sistemas o agente suporta?<svg class="ico" aria-hidden="true"><use href="#i-seta-baixo"/></svg></summary><div class="faq-int"><p>Windows e Linux. A biblioteca traz scripts para Windows, Linux e macOS, mas o agente para macOS ainda não é oficial.</p></div></details>
+        <details><summary>Como funciona o pagamento e o cancelamento?<svg class="ico" aria-hidden="true"><use href="#i-seta-baixo"/></svg></summary><div class="faq-int"><p>A cobrança é em reais, mensal ou anual (com 20% de desconto), processada pelo Stripe. A chave de licença aparece na página de confirmação assim que o pagamento é aprovado. Você pode cancelar quando quiser, sem multa: a licença segue valendo até o fim do período pago. Também vale o direito de arrependimento de 7 dias do Código de Defesa do Consumidor.</p></div></details>
+        <details><summary>Posso aumentar a quantidade de dispositivos depois?<svg class="ico" aria-hidden="true"><use href="#i-seta-baixo"/></svg></summary><div class="faq-int"><p>A quantidade é definida na contratação. Para ampliar, contrate a nova quantidade ou fale com vendas e emitimos a licença atualizada. Dispositivos revogados no painel deixam de contar.</p></div></details>
+        <details><summary>O código é aberto?<svg class="ico" aria-hidden="true"><use href="#i-seta-baixo"/></svg></summary><div class="faq-int"><p>Sim, o repositório é público sob licença MIT. A licença paga libera o uso acima de 5 dispositivos nos binários e no servidor oficiais e financia o desenvolvimento.</p></div></details>
+        <details><summary>Qual a diferença entre Profissional e MSP?<svg class="ico" aria-hidden="true"><use href="#i-seta-baixo"/></svg></summary><div class="faq-int"><p>Os recursos são os mesmos. Muda só a faixa de volume: do 6º ao 50º dispositivo o preço é de R$ 9,90 por dispositivo/mês, e a partir do 51º cada faixa fica mais barata. Os 5 primeiros dispositivos são sempre grátis.</p></div></details>
+      </div>
+    </div>
+  </section>
+
+  <section class="secao" aria-labelledby="t-final">
+    <div class="contem">
+      <div class="cta-final revelar">
+        <h2 id="t-final">Acenda o farol na sua operação</h2>
+        <p>Baixe, instale em minutos e veja os seus primeiros dispositivos online hoje. Sem cartão.</p>
+        <div class="hero-cta">
+          <a class="btn btn-primario btn-grande" href="#baixar">Baixar grátis</a>
+          <button class="btn btn-grande" type="button" data-vendas>Falar com vendas</button>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="rodape">
+  <div class="contem">
+    <div class="rodape-grade">
+      <div>
+        <a class="marca" href="/"><img src="/favicon.svg" width="30" height="30" alt="">Farol RMM</a>
+        <p>Monitoramento e suporte remoto auto-hospedado, com cobrança por dispositivo.</p>
+      </div>
+      <nav aria-label="Produto"><h4>Produto</h4><ul><li><a href="#recursos">Recursos</a></li><li><a href="#precos">Preços</a></li><li><a href="#baixar">Baixar</a></li><li><a href="#faq">Dúvidas</a></li></ul></nav>
+      <nav aria-label="Legal"><h4>Legal</h4><ul><li><a href="/termos.html">Termos de uso</a></li><li><a href="/privacidade.html">Privacidade</a></li></ul></nav>
+      <nav aria-label="Contato"><h4>Contato</h4><ul><li><a href="https://github.com/srlorenzos/farol-rmm" rel="noopener">GitHub</a></li><li><a href="mailto:lorenzoprofissional@gmail.com">lorenzoprofissional@gmail.com</a></li><li><button class="btn btn-fantasma btn-topo" type="button" data-vendas>Fale com vendas</button></li></ul></nav>
+    </div>
+    <div class="rodape-fim"><span>&copy; 2026 Eduardo Lorenzo. Farol RMM, licença MIT.</span><span>Feito no Brasil</span></div>
+  </div>
+</footer>
+
+<dialog id="dlg-contato" aria-labelledby="dlg-titulo">
+  <div class="dlg-int">
+    <div class="dlg-topo">
+      <div><h3 id="dlg-titulo">Fale com vendas</h3><p id="dlg-sub">Conte o que você precisa e respondemos por e-mail.</p></div>
+      <button class="fechar" type="button" data-fechar aria-label="Fechar"><svg class="ico" aria-hidden="true"><use href="#i-x"/></svg></button>
+    </div>
+    <form id="form-contato" novalidate>
+      <div class="campo-duplo">
+        <div class="campo"><label for="c-nome">Nome</label><input id="c-nome" name="nome" autocomplete="name" required maxlength="100"></div>
+        <div class="campo"><label for="c-email">E-mail</label><input id="c-email" name="email" type="email" autocomplete="email" required maxlength="254"></div>
+      </div>
+      <div class="campo-duplo">
+        <div class="campo"><label for="c-empresa">Empresa <small>(opcional)</small></label><input id="c-empresa" name="empresa" autocomplete="organization" maxlength="100"></div>
+        <div class="campo"><label for="c-disp">Dispositivos <small>(opcional)</small></label><input id="c-disp" name="dispositivos" type="number" inputmode="numeric" min="1" max="100000"></div>
+      </div>
+      <div class="campo"><label for="c-msg">Mensagem <small>(opcional)</small></label><textarea id="c-msg" name="mensagem" maxlength="2000"></textarea></div>
+      <div class="isca" aria-hidden="true"><label for="c-site">Não preencha</label><input id="c-site" name="site" tabindex="-1" autocomplete="off"></div>
+      <p class="msg msg-erro" id="c-erro" role="alert" hidden></p>
+      <p class="msg msg-ok" id="c-ok" role="status" hidden></p>
+      <button class="btn btn-primario btn-bloco btn-grande" type="submit" id="c-enviar">Enviar</button>
+    </form>
+  </div>
+</dialog>
+
+<script type="module" src="/js/site.js"></script>
+</body>
+</html>
