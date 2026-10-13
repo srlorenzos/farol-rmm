@@ -1,4 +1,4 @@
-; Instalador do agente Farol RMM (Inno Setup 6).
+﻿; Instalador do agente Farol RMM (Inno Setup 6).
 ; Compilar:  ISCC.exe /DVersao=2.0.0 /DOrigem=<pasta com farol-agente\ e farol-bandeja.exe> /DSaida=<pasta> farol.iss
 ; Uso interativo: assistente pede a URL do servidor e o token.
 ; Implantação em massa (GPO/Intune/RMM):  FarolAgenteSetup.exe /VERYSILENT /SERVIDOR=https://farol.exemplo.com /TOKEN=xxxx
