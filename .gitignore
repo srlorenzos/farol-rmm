@@ -5,3 +5,12 @@ dados/
 *.db-*
 __pycache__/
 .venv/
+
+# Segredos e deploys locais
+farol-segredos/
+*.pem
+site/.vercel/
+site/.env
+site/.env.*
+!site/.env.exemplo
+site/node_modules/

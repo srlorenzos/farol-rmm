@@ -121,6 +121,12 @@ export default {
       schema: { body: { type: 'object', required: ['token', 'info'], additionalProperties: false,
         properties: { token: { type: 'string', minLength: 20, maxLength: 128 }, info: infoSchema } } },
     }, async (req, reply) => {
+      // Limite de dispositivos da licença (módulo licenca, opcional): recusa antes de gastar o token.
+      const bloqueio = ctx.servicos.licenca?.verificarRegistro?.();
+      if (bloqueio) {
+        ctx.auditar({ acao: 'agente_registro_negado', detalhes: bloqueio, ip: req.ip });
+        return reply.code(402).send({ erro: bloqueio });
+      }
       const agora = Date.now();
       const hash = sha256(req.body.token);
       const resultado = transacao(db, () => {
