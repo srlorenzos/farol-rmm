@@ -1,0 +1,16 @@
+{
+  "name": "farol-rmm-site",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Site de vendas do Farol RMM: HTML/CSS/JS puro + funções Vercel (Stripe e Vercel Blob)",
+  "license": "MIT",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "teste": "node scripts/testar-funcoes.mjs",
+    "servir": "python -m http.server 4173 --directory publico"
+  },
+  "dependencies": {
+    "@vercel/blob": "2.8.1"
+  }
+}
