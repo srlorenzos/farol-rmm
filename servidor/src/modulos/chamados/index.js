@@ -275,25 +275,35 @@ export default {
     });
 
     // =============================== API do agente (bandeja) ===============================
+    // Tudo POST (como as demais rotas /api/agente/*: registrar, checkin, resultado) — a bandeja não tem o
+    // segredo do agente; é a API local do agente (agente/farol/modulos/api_local.py) quem fala daqui pra
+    // frente usando o cliente HTTP já autenticado do próprio agente (que só sabe fazer POST).
     const agente = { preHandler: ctx.autenticarAgente, config: ctx.limiteAgente() };
+    const corpoAnexo = { anexo_base64: { type: 'string', maxLength: 7_000_000 }, anexo_tipo: { type: 'string', maxLength: 60 }, anexo_nome: { type: 'string', maxLength: 200 } };
 
-    app.get('/api/agente/chamados', {
+    function pertenceAoAgente(id, agenteId) {
+      const c = db.prepare('SELECT * FROM chamados WHERE id = ? AND agente_id = ?').get(id, agenteId);
+      if (!c) throw Object.assign(new Error('Chamado não encontrado'), { statusCode: 404 });
+      return c;
+    }
+
+    app.post('/api/agente/chamados/listar', {
       ...agente,
-      schema: { querystring: { type: 'object', properties: { usuario: { type: 'string', maxLength: 255 } } } },
+      schema: { body: { type: 'object', additionalProperties: false, properties: { usuario: { type: 'string', maxLength: 255 } } } },
     }, async (req) => {
-      const u = req.query.usuario || '';
+      const u = req.body?.usuario || '';
       const linhas = db.prepare(`SELECT * FROM chamados WHERE agente_id = ?${u ? ' AND usuario_windows = ?' : ''} ORDER BY id DESC LIMIT 200`)
         .all(...(u ? [req.agente.id, u] : [req.agente.id]));
       return linhas.map((c) => ({ ...linhaPublica(c), ultima_mensagem: db.prepare('SELECT autor_tipo, texto, criado_em FROM chamados_mensagens WHERE chamado_id = ? ORDER BY id DESC LIMIT 1').get(c.id) ?? null }));
     });
 
-    app.get('/api/agente/chamados/:id', { ...agente, schema: { params: PARAMS_ID } }, async (req, reply) => {
-      const c = db.prepare('SELECT * FROM chamados WHERE id = ? AND agente_id = ?').get(req.params.id, req.agente.id);
-      if (!c) return reply.code(404).send({ erro: 'Chamado não encontrado' });
+    app.post('/api/agente/chamados/obter', { ...agente, schema: { body: { type: 'object', required: ['id'], additionalProperties: false, properties: { id: { type: 'integer', minimum: 1 } } } } }, async (req, reply) => {
+      let c;
+      try { c = pertenceAoAgente(req.body.id, req.agente.id); } catch (e) { return reply.code(e.statusCode).send({ erro: e.message }); }
       return { ...linhaPublica(c), mensagens: mensagens(c.id), anexos: anexos(c.id) };
     });
 
-    app.post('/api/agente/chamados', {
+    app.post('/api/agente/chamados/criar', {
       ...agente,
       bodyLimit: 8 * 1024 * 1024,
       schema: { body: { type: 'object', required: ['assunto', 'descricao'], additionalProperties: false, properties: {
@@ -303,9 +313,7 @@ export default {
         prioridade: { type: 'string', enum: PRIORIDADES, default: 'normal' },
         usuario_windows: { type: ['string', 'null'], maxLength: 255 },
         dados_sistema: { type: ['object', 'null'] },
-        anexo_base64: { type: 'string', maxLength: 7_000_000 },
-        anexo_tipo: { type: 'string', maxLength: 60 },
-        anexo_nome: { type: 'string', maxLength: 200 },
+        ...corpoAnexo,
       } } },
     }, async (req, reply) => {
       const b = req.body;
@@ -334,19 +342,18 @@ export default {
       return reply.code(201).send({ id: resultado.id });
     });
 
-    app.post('/api/agente/chamados/:id/mensagens', {
+    app.post('/api/agente/chamados/responder', {
       ...agente,
       bodyLimit: 8 * 1024 * 1024,
-      schema: { params: PARAMS_ID, body: { type: 'object', required: ['texto'], additionalProperties: false, properties: {
+      schema: { body: { type: 'object', required: ['id', 'texto'], additionalProperties: false, properties: {
+        id: { type: 'integer', minimum: 1 },
         texto: { type: 'string', minLength: 1, maxLength: 8000 },
         usuario_windows: { type: ['string', 'null'], maxLength: 255 },
-        anexo_base64: { type: 'string', maxLength: 7_000_000 },
-        anexo_tipo: { type: 'string', maxLength: 60 },
-        anexo_nome: { type: 'string', maxLength: 200 },
+        ...corpoAnexo,
       } } },
     }, async (req, reply) => {
-      const c = db.prepare('SELECT * FROM chamados WHERE id = ? AND agente_id = ?').get(req.params.id, req.agente.id);
-      if (!c) return reply.code(404).send({ erro: 'Chamado não encontrado' });
+      let c;
+      try { c = pertenceAoAgente(req.body.id, req.agente.id); } catch (e) { return reply.code(e.statusCode).send({ erro: e.message }); }
       const agora = Date.now();
       const b = req.body;
       try {
@@ -369,23 +376,27 @@ export default {
       return { ok: true };
     });
 
-    app.post('/api/agente/chamados/:id/fechar', { ...agente, schema: { params: PARAMS_ID } }, async (req, reply) => {
-      const c = db.prepare('SELECT * FROM chamados WHERE id = ? AND agente_id = ?').get(req.params.id, req.agente.id);
-      if (!c) return reply.code(404).send({ erro: 'Chamado não encontrado' });
+    app.post('/api/agente/chamados/fechar', { ...agente, schema: { body: { type: 'object', required: ['id'], additionalProperties: false, properties: { id: { type: 'integer', minimum: 1 } } } } }, async (req, reply) => {
+      let c;
+      try { c = pertenceAoAgente(req.body.id, req.agente.id); } catch (e) { return reply.code(e.statusCode).send({ erro: e.message }); }
       const agora = Date.now();
       db.prepare("UPDATE chamados SET status = 'fechado', fechado_em = ?, atualizado_em = ? WHERE id = ?").run(agora, agora, c.id);
       ctx.emitir('chamado', { id: c.id, agente_id: req.agente.id, status: 'fechado' }, { permissao: 'chamados.ver' });
       return { ok: true };
     });
 
-    app.get('/api/agente/chamados/:id/anexos/:anexoId', { ...agente, schema: { params: PARAMS_CHAMADO_ANEXO } }, async (req, reply) => {
-      const c = db.prepare('SELECT id FROM chamados WHERE id = ? AND agente_id = ?').get(req.params.id, req.agente.id);
-      if (!c) return reply.code(404).send({ erro: 'Chamado não encontrado' });
-      const a = db.prepare('SELECT * FROM chamados_anexos WHERE id = ? AND chamado_id = ?').get(req.params.anexoId, c.id);
+    // Anexo devolvido em base64 dentro do JSON (a bandeja não fala binário com o agente): simples e sem
+    // precisar de outro verbo HTTP no cliente do agente (que só tem .post()).
+    app.post('/api/agente/chamados/anexo', {
+      ...agente,
+      schema: { body: { type: 'object', required: ['id', 'anexo_id'], additionalProperties: false, properties: { id: { type: 'integer', minimum: 1 }, anexo_id: { type: 'integer', minimum: 1 } } } },
+    }, async (req, reply) => {
+      try { pertenceAoAgente(req.body.id, req.agente.id); } catch (e) { return reply.code(e.statusCode).send({ erro: e.message }); }
+      const a = db.prepare('SELECT * FROM chamados_anexos WHERE id = ? AND chamado_id = ?').get(req.body.anexo_id, req.body.id);
       if (!a || !existsSync(a.caminho)) return reply.code(404).send({ erro: 'Anexo não encontrado' });
-      return reply.type(a.tipo || 'application/octet-stream').send(readFileSync(a.caminho));
+      return { nome_arquivo: a.nome_arquivo, tipo: a.tipo, tamanho: a.tamanho, conteudo_base64: readFileSync(a.caminho).toString('base64') };
     });
 
-    app.get('/api/agente/bandeja/config', { ...agente }, async () => ctx.servicos.chamados.configBandeja());
+    app.post('/api/agente/bandeja/config', { ...agente }, async () => ctx.servicos.chamados.configBandeja());
   },
 };
