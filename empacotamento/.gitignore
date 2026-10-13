@@ -1,0 +1,6 @@
+build/
+dist/
+*.spec.bak
+__pycache__/
+servidor/node_modules/
+servidor/pacote/
