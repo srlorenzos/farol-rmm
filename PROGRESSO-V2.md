@@ -13,6 +13,7 @@ Objetivo: RMM completo no nível do Datto RMM (funções + visual premium), iden
 - [ ] Automação: jobs agendados, políticas de monitoramento, auto-resposta
 - [ ] Patches (Windows Update, apt/dnf), software (winget), relatórios, dashboards
 - [ ] Usuários/RBAC, notificações (e-mail/Teams/Discord), demo atualizada na vitrine
+- [x] Licenças e site de vendas: módulo `licenca` no servidor (chave Ed25519 `FAROL-<payload>.<assinatura>` verificada offline; grátis até 5 dispositivos; carência de 7 dias; aviso 15 dias antes; recusa de registro com HTTP 402 via serviço `licenca.verificarRegistro()` chamado pelo módulo agentes; Configurações → Licença e aviso na visão geral), `servidor/scripts/emitir-licenca.js`, 62 testes do servidor passando. Site em `site/` (HTML/CSS/JS puro + funções Vercel: checkout Stripe, webhook, licença por sessão, contato; Blob privado), publicado em https://farol-rmm.vercel.app (projeto Vercel `farol-rmm`, time coube-studio; deploy sempre de cópia fora do repo, ver README). Pendente do dono: variáveis `STRIPE_*`, `LICENCA_CHAVE_PRIVADA`, `BLOB_READ_WRITE_TOKEN` e o webhook do Stripe. Chave privada e licença do dono em `..arol-segredos\` (fora do repo).
 
 ## Para retomar
 Ler este arquivo, ARQUITETURA.md e `git log`. Itens não marcados: relançar o agente correspondente.

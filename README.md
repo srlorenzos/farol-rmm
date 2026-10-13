@@ -239,6 +239,28 @@ python -m unittest discover -s agente/testes -v           # 17 testes
 
 O servidor é testado com `fastify.inject` e banco em memória: hash de senha, vetores TOTP do RFC 6238 (SHA-1/256/512), login com 2FA, bloqueio progressivo, CSRF, CSP, rate limit, token de instalação (uso único, expirado, inválido), check-in autenticado e negado, ciclo completo de job, truncamento, regras de alerta abrindo e resolvendo, webhook e auditoria. O agente é testado na coleta de métricas e inventário, execução com timeout matando a árvore de processos, truncamento, montagem do payload e recusa de `http://` não local. O GitHub Actions roda os dois conjuntos a cada push.
 
+## Licenças e site
+
+**Modelo.** O servidor funciona sem licença até **5 dispositivos**. Acima disso é preciso uma chave `FAROL-<payload>.<assinatura>`: um JSON `{id, cliente, email, plano, dispositivos_max, emitida_em, expira_em}` assinado com **Ed25519** e verificado **offline** pela chave pública embutida em `servidor/src/modulos/licenca/chave.js` (nenhum acesso à internet). `dispositivos_max = 0` significa ilimitado.
+
+- Instale em **Configurações → Licença** (só administrador). A tela mostra plano, uso (x de y dispositivos), validade e avisa 15 dias antes de vencer; na visão geral aparece um aviso discreto perto do limite.
+- Vencida, a licença tem **carência de 7 dias**; depois volta ao limite de 5 para **novos registros** (dispositivos já registrados continuam). No registro acima do limite o agente recebe HTTP 402 com a mensagem do motivo.
+- Emissão manual (dono): `node servidor/scripts/emitir-licenca.js --privada <licenca-privada.pem> --cliente "Nome" --dispositivos 50 --dias 365` (`--dispositivos ilimitado`, `--sem-validade`). A chave **privada nunca entra no repositório**; no site ela vive só na variável `LICENCA_CHAVE_PRIVADA`.
+
+**Site de vendas (`site/`).** Landing em HTML/CSS/JS puro, CSP estrita, tema escuro/claro, calculadora de preços (`publico/js/precos.js` é a fonte única dos valores), funções Vercel em `api/`:
+
+| Função | O que faz |
+|---|---|
+| `api/checkout.js` | cria a Stripe Checkout Session (assinatura) recalculando o preço no servidor |
+| `api/webhook.js` | valida `Stripe-Signature` (corpo raw) e emite a licença em `checkout.session.completed` / renova em `invoice.paid`; guarda em `farol/licencas/` (Vercel Blob privado) |
+| `api/licenca.js` | `/sucesso.html` busca a licença da sessão paga (só devolve a da própria sessão) |
+| `api/contato.js` | formulário "Fale com vendas" (guarda em `farol/contatos/`; sem Blob o site abre um `mailto`) |
+| `api/config.js` | informa se a compra online está ativa |
+
+Sem `STRIPE_SECRET_KEY` (e o resto do `.env.exemplo`) os botões de compra viram "Fale com vendas". Preços: grátis até 5; R$ 9,90 por dispositivo/mês do 6º ao 50º, e faixas de R$ 7,90, 5,90 e 4,50 acima disso; anual com 20% de desconto.
+
+Testes locais: `cd site && npm install && npm run teste` (runner com `req`/`res` falsos); `node scripts/servir-local.mjs` serve o site com as funções. **Deploy:** a CLI da Vercel recusa pastas dentro de repo git com autor noreply, então copie `site/` (sem `node_modules`) para uma pasta fora do repositório, guarde nela o `.vercel/project.json` (há uma cópia em `site/.vercel/`, ignorada pelo git) e rode `vercel deploy --prod --yes --scope coube-studio`.
+
 ## Roadmap
 
 - Acesso remoto (terminal interativo e área de trabalho via WebRTC)
