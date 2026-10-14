@@ -5,13 +5,15 @@ import { icone } from '../../nucleo/icones.js';
 import { get, post, put, qs } from '../../nucleo/api.js';
 import { estado, emitir, aoEvento, paramsEscopo, pode } from '../../nucleo/estado.js';
 import { relativo, fmtData, fmtInt, normalizar } from '../../nucleo/formato.js';
-import { cabecalhoPagina, chipsFiltro, busca, severidade, selo, vazio, skeleton, botao, interruptor, input, aviso, comCarregando } from '../../ui/componentes.js';
+import { cabecalhoPagina, chipsFiltro, busca, severidade, selo, vazio, skeleton, botao, interruptor, input, aviso, comCarregando, campo, select, segmentado } from '../../ui/componentes.js';
 import { tabelaVirtual } from '../../ui/tabela-virtual.js';
 import { composicao } from '../../ui/graficos.js';
-import { toast, toastErro } from '../../ui/camadas.js';
+import { toast, toastErro, modal } from '../../ui/camadas.js';
 
 const TIPOS = { cpu: 'CPU', ram: 'Memória', disco: 'Disco', offline: 'Offline' };
 const nomeTipo = (t) => TIPOS[t] ?? t.replace(/^monitor:/, 'Monitor: ');
+// chave do limite na API/override: offline usa "minutos", os outros usam "limite"; sufixo é só para exibição.
+const NOMES_OVERRIDE = { cpu: ['CPU', '%', 'limite'], ram: ['Memória', '%', 'limite'], disco: ['Disco', '%', 'limite'], offline: ['Offline', 'min', 'minutos'] };
 
 function duracao(ms) {
   const min = Math.round(ms / 60000);
@@ -45,7 +47,8 @@ function colunas({ comDispositivo = true } = {}) {
     { id: 'msg', rotulo: 'Mensagem', largura: 'minmax(240px, 2fr)', render: (a) => h('span', { title: a.mensagem, text: a.mensagem }), valor: (a) => a.mensagem },
     { id: 'quando', rotulo: 'Aberto', largura: '130px', render: (a) => h('span', { class: 'muted', title: fmtData(a.aberto_em), text: relativo(a.aberto_em) }), valor: (a) => -a.aberto_em },
     { id: 'estado', rotulo: 'Estado', largura: '170px', render: (a) => (a.status === 'aberto'
-      ? selo(`Aberto há ${duracao(Date.now() - a.aberto_em)}`, 'neutro', { icone: 'relogio' })
+      ? (a.suprimido ? selo('Suprimido', 'neutro', { icone: 'relogio', dica: 'Dispositivo em manutenção: não conta como aberto nem dispara webhook' })
+        : selo(`Aberto há ${duracao(Date.now() - a.aberto_em)}`, 'neutro', { icone: 'relogio' }))
       : h('span', { class: 'sutil pequeno', title: a.resolvido_por ? `por ${a.resolvido_por}` : 'automaticamente', text: `Resolvido · durou ${duracao(a.resolvido_em - a.aberto_em)}` })), valor: (a) => (a.status === 'aberto' ? 0 : 1) },
     { id: 'acao', rotulo: '', rotuloAria: 'Ações', largura: '104px', ordenavel: false, render: (a) => (a.status === 'aberto' && pode('alertas.resolver')
       ? h('div', { class: 'acoes-linha' }, botao('Resolver', { tamanho: 'pequeno', icone: 'check', onclick: () => resolver([a.id]) })) : null) },
@@ -105,13 +108,167 @@ function paginaAlertas(raiz, { query }) {
   return aoEvento('alerta', recarregar);
 }
 
+const OPCOES_DURACAO = [[15, '15 minutos'], [30, '30 minutos'], [60, '1 hora'], [120, '2 horas'], [240, '4 horas'], [480, '8 horas'], [1440, '24 horas'], [10080, '7 dias']];
+
+/** Modal "Colocar em manutenção". Sem `alvoFixo`, deixa escolher cliente/site/todos (usado em Configurações). */
+function abrirManutencaoModal({ alvoFixo, labelFixo } = {}) {
+  const { promessa } = modal({
+    titulo: 'Colocar em manutenção', descricao: labelFixo, icone: 'relogio',
+    conteudo: (fechar) => {
+      let alvoSel = alvoFixo ?? { tipo: 'todos' };
+      const alvoArea = h('div', {});
+      if (!alvoFixo) {
+        const opcoesSites = estado.clientes.flatMap((c) => c.sites.map((x) => [`site:${x.id}`, `Site · ${c.nome} · ${x.nome}`]));
+        const opcoesClientes = estado.clientes.map((c) => [`cliente:${c.id}`, `Cliente · ${c.nome}`]);
+        const sel = select([['todos', 'Todos os dispositivos'], ...opcoesClientes, ...opcoesSites], 'todos');
+        sel.addEventListener('change', () => { const [tipo, id] = sel.value.split(':'); alvoSel = tipo === 'todos' ? { tipo: 'todos' } : { tipo, id: Number(id) }; });
+        preencher(alvoArea, campo('Onde', sel));
+      }
+      const dur = select(OPCOES_DURACAO.map(([v, l]) => [String(v), l]), '60');
+      const motivo = input({ tipo: 'text', placeholder: 'Opcional', attrs: { maxlength: 300 } });
+      const enviar = botao('Iniciar manutenção', { variante: 'primario', icone: 'check' });
+      enviar.addEventListener('click', () => comCarregando(enviar, async () => {
+        try {
+          const r = await post('/api/alertas/manutencao', { alvo: alvoSel, duracaoMin: Number(dur.value), motivo: motivo.value.trim() || undefined });
+          toast('Janela de manutenção iniciada.', 'sucesso');
+          fechar(r);
+        } catch (e) { toastErro(e); }
+      }));
+      return h('div', { class: 'pilha' },
+        alvoArea,
+        campo('Duração', dur, { ajuda: 'A partir de agora. Alertas continuam sendo registrados, sem disparar webhook nem contar como abertos.' }),
+        campo('Motivo (opcional)', motivo),
+        h('div', { class: 'modal-acoes' }, enviar));
+    },
+  });
+  return promessa;
+}
+
+/** Modal de exceção de alerta por agente (um tipo: cpu/ram/disco/offline). */
+function abrirOverrideModal(agente, tipo, atual, global) {
+  const [nome, sufixo, chave] = NOMES_OVERRIDE[tipo];
+  const temCiclos = tipo === 'cpu' || tipo === 'ram';
+  let modo = !atual ? 'global' : atual.ativo === false ? 'desligado' : 'personalizado';
+  const { promessa } = modal({
+    titulo: `Exceção de ${nome}`, descricao: agente.hostname, icone: 'config',
+    conteudo: (fechar) => {
+      const campoValor = input({ tipo: 'number', valor: atual?.[chave] ?? global[chave], classe: 'input-curto', attrs: { min: 1, max: chave === 'minutos' ? 10080 : 100 } });
+      const campoCiclos = temCiclos ? input({ tipo: 'number', valor: atual?.ciclos ?? global.ciclos, classe: 'input-curto', attrs: { min: 1, max: 100 } }) : null;
+      const areaPersonalizado = h('div', { class: 'linha mt-2' },
+        h('label', { class: 'linha pequeno muted' }, chave === 'minutos' ? 'Por mais de' : 'Acima de', campoValor, sufixo),
+        temCiclos ? h('label', { class: 'linha pequeno muted' }, 'por', campoCiclos, 'check-ins') : null);
+      const resumo = h('p', { class: 'sutil pequeno mt-2' });
+      const atualizarResumo = () => {
+        areaPersonalizado.hidden = modo !== 'personalizado';
+        resumo.textContent = modo === 'global' ? `Usa a regra global: ${global[chave]}${sufixo}${temCiclos ? ` por ${global.ciclos} check-ins` : ''}.`
+          : modo === 'desligado' ? 'Este alerta nunca dispara para este dispositivo.' : '';
+      };
+      const radios = segmentado([['global', 'Regra global'], ['desligado', 'Desligado aqui'], ['personalizado', 'Personalizado']], modo, (v) => { modo = v; atualizarResumo(); }, 'Modo');
+      atualizarResumo();
+      const salvar = botao('Salvar', { variante: 'primario', icone: 'check' });
+      salvar.addEventListener('click', () => comCarregando(salvar, async () => {
+        try {
+          const corpo = { agente_id: agente.id, tipo };
+          if (modo === 'desligado') corpo.ativo = false;
+          if (modo === 'personalizado') { corpo[chave] = Number(campoValor.value); if (temCiclos) corpo.ciclos = Number(campoCiclos.value); }
+          await put('/api/alertas/overrides', corpo);
+          toast('Exceção salva.', 'sucesso');
+          fechar(true);
+        } catch (e) { toastErro(e); }
+      }));
+      return h('div', { class: 'pilha' }, radios, areaPersonalizado, resumo, h('div', { class: 'modal-acoes' }, salvar));
+    },
+  });
+  return promessa;
+}
+
+function blocoManutencao(el, agente) {
+  const corpo = h('div', { class: 'cartao-corpo' }, skeleton(2));
+  el.append(h('section', { class: 'cartao mb-4' }, h('header', { class: 'cartao-cabecalho' }, h('h2', { text: 'Manutenção' })), corpo));
+  const carregar = async () => {
+    try {
+      const janelas = await get(`/api/alertas/manutencao?agente=${agente.id}`);
+      const relevantes = janelas.filter((j) => j.estado === 'ativa' || j.estado === 'agendada');
+      preencher(corpo,
+        agente.em_manutencao ? aviso('Este dispositivo está em manutenção agora: alertas continuam sendo registrados, mas não disparam webhook nem contam como abertos.', 'info') : null,
+        relevantes.length ? h('ul', { class: 'lista-linhas' }, relevantes.map((j) => h('li', { class: 'linha-entre' },
+          h('div', {}, h('span', { class: 'forte pequeno', text: j.estado === 'ativa' ? 'Ativa' : 'Agendada' }),
+            h('div', { class: 'sutil pequeno', text: `${fmtData(j.inicio)} → ${fmtData(j.fim)}${j.motivo ? ' · ' + j.motivo : ''}` })),
+          pode('alertas.configurar') ? botao('Cancelar', { tamanho: 'pequeno', onclick: async () => {
+            try { await post(`/api/alertas/manutencao/${j.id}/cancelar`); toast('Janela cancelada.', 'sucesso'); carregar(); } catch (e) { toastErro(e); }
+          } }) : null)))
+          : h('p', { class: 'sutil pequeno', text: 'Nenhuma janela de manutenção agendada ou ativa.' }),
+        pode('alertas.configurar') ? h('div', { class: 'mt-3' }, botao('Colocar em manutenção', { icone: 'relogio', onclick: async () => {
+          const r = await abrirManutencaoModal({ alvoFixo: { tipo: 'agente', id: agente.id }, labelFixo: agente.hostname });
+          if (r) carregar();
+        } })) : null);
+    } catch (e) { toastErro(e); }
+  };
+  carregar();
+}
+
+function blocoOverrides(el, agente) {
+  if (!pode('alertas.ver')) return;
+  const corpo = h('div', { class: 'cartao-corpo' }, skeleton(4));
+  el.append(h('section', { class: 'cartao mb-4' },
+    h('header', { class: 'cartao-cabecalho' }, h('h2', { text: 'Exceções de alerta' }),
+      h('p', { class: 'sutil pequeno', text: 'Limites específicos deste dispositivo; sem exceção, usa a regra global.' })),
+    corpo));
+  const carregar = async () => {
+    try {
+      const [overrides, cfg] = await Promise.all([get(`/api/alertas/overrides?agente=${agente.id}`), get('/api/config')]);
+      const porTipo = Object.fromEntries(overrides.map((o) => [o.tipo, o]));
+      const linhas = Object.keys(NOMES_OVERRIDE).map((tipo) => {
+        const [nome, sufixo, chave] = NOMES_OVERRIDE[tipo];
+        const global = cfg.regras[tipo];
+        const atual = porTipo[tipo];
+        const desc = !atual ? `Regra global (${global[chave]}${sufixo})`
+          : atual.ativo === false ? 'Desligado neste dispositivo'
+          : `Personalizado: ${atual[chave] ?? global[chave]}${sufixo}`;
+        return h('li', { class: 'linha-entre' },
+          h('div', {}, h('span', { class: 'forte pequeno', text: nome }), h('div', { class: 'sutil pequeno', text: desc })),
+          pode('alertas.configurar') ? botao('Editar', { tamanho: 'pequeno', onclick: async () => { if (await abrirOverrideModal(agente, tipo, atual, global)) carregar(); } }) : null);
+      });
+      preencher(corpo, h('ul', { class: 'lista-linhas' }, linhas));
+    } catch (e) { toastErro(e); }
+  };
+  carregar();
+}
+
 function abaAlertas(el, { agente }) {
+  blocoManutencao(el, agente);
+  blocoOverrides(el, agente);
   const tabela = tabelaVirtual({ rotulo: 'Alertas do dispositivo', chave: (a) => a.id, colunas: colunas({ comDispositivo: false }), ordem: { coluna: 'quando', direcao: 'asc' },
     vazio: () => vazio({ titulo: 'Nenhum alerta neste dispositivo', texto: 'Quando uma regra for violada, o alerta aparece aqui.', ilustracao: 'tudo-ok', compacto: true }) });
   el.append(h('section', { class: 'cartao' }, tabela.el));
   const carregar = async () => { try { tabela.definirLinhas(await get(`/api/alertas?agente=${agente.id}&status=todos&limite=500`)); } catch (e) { toastErro(e); } };
   carregar();
   return aoEvento('alerta', (d) => { if (d.agente_id === agente.id) carregar(); });
+}
+
+function secaoManutencao(el) {
+  const podeEditar = pode('alertas.configurar');
+  const corpo = h('div', {}, skeleton(4));
+  const carregar = async () => {
+    try {
+      const janelas = await get('/api/alertas/manutencao');
+      const relevantes = janelas.filter((j) => j.estado === 'ativa' || j.estado === 'agendada');
+      preencher(corpo,
+        relevantes.length ? h('ul', { class: 'lista-linhas cartao' }, relevantes.map((j) => h('li', { class: 'linha-entre' },
+          h('div', {}, h('span', { class: 'forte pequeno', text: j.alvo_label }),
+            h('div', { class: 'sutil pequeno', text: `${j.estado === 'ativa' ? 'Ativa' : 'Agendada'} · ${fmtData(j.inicio)} → ${fmtData(j.fim)}${j.motivo ? ' · ' + j.motivo : ''}` })),
+          podeEditar ? botao('Cancelar', { tamanho: 'pequeno', onclick: async () => {
+            try { await post(`/api/alertas/manutencao/${j.id}/cancelar`); toast('Janela cancelada.', 'sucesso'); carregar(); } catch (e) { toastErro(e); }
+          } }) : null)))
+          : h('p', { class: 'sutil pequeno', text: 'Nenhuma janela de manutenção ativa ou agendada.' }),
+        podeEditar ? h('div', { class: 'mt-3' }, botao('Nova janela de manutenção', { icone: 'relogio', onclick: async () => {
+          const r = await abrirManutencaoModal({});
+          if (r) carregar();
+        } })) : null);
+    } catch (e) { toastErro(e); }
+  };
+  carregar();
+  el.append(corpo);
 }
 
 function widgetSeveridade(el) {
@@ -203,10 +360,12 @@ export default {
     farol.rota('/alertas', { titulo: 'Alertas', permissao: 'alertas.ver', render: paginaAlertas });
     farol.abaDispositivo({ id: 'alertas', rotulo: 'Alertas', icone: 'alertas', ordem: 60, permissao: 'alertas.ver', render: abaAlertas, contagem: (a) => a.alertas_abertos });
     farol.colunaDispositivo({ id: 'alertas', rotulo: 'Alertas', largura: '96px', ordem: 100,
-      render: (a) => (a.alertas_abertos ? h('a', { href: `#/dispositivos/${a.id}?aba=alertas` }, selo(String(a.alertas_abertos), a.alerta_severidade === 'critico' ? 'critico' : 'aviso', { icone: a.alerta_severidade === 'critico' ? 'critico' : 'aviso' })) : h('span', { class: 'sutil', text: '—' })),
+      render: (a) => (a.em_manutencao ? selo('Manut.', 'neutro', { icone: 'relogio', dica: 'Em manutenção: alertas suprimidos' })
+        : a.alertas_abertos ? h('a', { href: `#/dispositivos/${a.id}?aba=alertas` }, selo(String(a.alertas_abertos), a.alerta_severidade === 'critico' ? 'critico' : 'aviso', { icone: a.alerta_severidade === 'critico' ? 'critico' : 'aviso' })) : h('span', { class: 'sutil', text: '—' })),
       valor: (a) => -(a.alertas_abertos ?? 0) });
     farol.widget({ id: 'alertas', titulo: 'Alertas por severidade', ordem: 20, tamanho: 4, permissao: 'alertas.ver', render: widgetSeveridade });
     farol.secaoConfig({ id: 'alertas', rotulo: 'Regras de alerta', descricao: 'Limites de CPU, memória, disco e offline, e o webhook.', icone: 'alertas', ordem: 40, permissao: 'alertas.ver', render: secaoRegras });
+    farol.secaoConfig({ id: 'alertas-manutencao', rotulo: 'Janelas de manutenção', descricao: 'Suspenda alertas e webhook temporariamente em dispositivos, sites ou clientes.', icone: 'relogio', ordem: 41, permissao: 'alertas.ver', render: secaoManutencao });
     farol.notificacoes({
       id: 'alertas', permissao: 'alertas.ver', eventos: ['alerta'], href: '#/alertas',
       contar: async () => (await atualizarContador())?.abertos ?? 0,
