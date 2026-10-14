@@ -174,6 +174,23 @@ function criarServico(ctx) {
     },
 
     regras: () => regrasAtuais(db),
+
+    /**
+     * Define (ou remove, se `ajustes` for {}) a exceção de um tipo de alerta para um agente — mesma lógica
+     * de PUT /api/alertas/overrides, reaproveitada por políticas (um "aplicar" ajusta vários agentes de
+     * uma vez, sem duplicar esta regra de merge/gravação).
+     * @param {{ativo?, limite?, ciclos?, minutos?}} ajustes
+     */
+    definirOverride(agenteId, tipo, ajustes, { usuario = 'sistema (política)' } = {}) {
+      if (!Object.keys(ajustes).length) {
+        db.prepare('DELETE FROM alertas_overrides WHERE agente_id = ? AND tipo = ?').run(agenteId, tipo);
+        return { tipo, removido: true };
+      }
+      db.prepare(`INSERT INTO alertas_overrides (agente_id, tipo, ajustes_json, criado_por, atualizado_em) VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(agente_id, tipo) DO UPDATE SET ajustes_json = excluded.ajustes_json, atualizado_em = excluded.atualizado_em`)
+        .run(agenteId, tipo, JSON.stringify(ajustes), usuario, Date.now());
+      return { tipo, ...ajustes };
+    },
   };
   return servico;
 }
@@ -556,16 +573,9 @@ export default {
       if (b.limite != null) ajustes.limite = b.limite;
       if (b.ciclos != null) ajustes.ciclos = b.ciclos;
       if (b.minutos != null) ajustes.minutos = b.minutos;
-      if (!Object.keys(ajustes).length) {
-        db.prepare('DELETE FROM alertas_overrides WHERE agente_id = ? AND tipo = ?').run(b.agente_id, b.tipo);
-        ctx.auditarReq(req, 'alerta_override_removido', { alvo: agente.hostname, agente_id: agente.id, detalhes: { tipo: b.tipo } });
-        return { tipo: b.tipo, removido: true };
-      }
-      db.prepare(`INSERT INTO alertas_overrides (agente_id, tipo, ajustes_json, criado_por, atualizado_em) VALUES (?, ?, ?, ?, ?)
-        ON CONFLICT(agente_id, tipo) DO UPDATE SET ajustes_json = excluded.ajustes_json, atualizado_em = excluded.atualizado_em`)
-        .run(b.agente_id, b.tipo, JSON.stringify(ajustes), req.sessao.usuario, Date.now());
-      ctx.auditarReq(req, 'alerta_override_definido', { alvo: agente.hostname, agente_id: agente.id, detalhes: { tipo: b.tipo, ajustes } });
-      return { tipo: b.tipo, ...ajustes };
+      const r = ctx.servicos.alertas.definirOverride(b.agente_id, b.tipo, ajustes, { usuario: req.sessao.usuario });
+      ctx.auditarReq(req, r.removido ? 'alerta_override_removido' : 'alerta_override_definido', { alvo: agente.hostname, agente_id: agente.id, detalhes: { tipo: b.tipo, ...(r.removido ? {} : { ajustes }) } });
+      return r;
     });
   },
 };

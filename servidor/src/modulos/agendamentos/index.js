@@ -31,6 +31,78 @@ function obterScript(ctx, { script_id, biblioteca_id }) {
   return ctx.servicos.jobs.resolverScript({ script_id, biblioteca_id });
 }
 
+/**
+ * Cria um agendamento. Usada por POST /api/agendamentos e por ctx.servicos.agendamentos.criar() (ex.:
+ * políticas aplicando um "molde" de agendamento a um alvo) — uma validação só, nunca duas.
+ * @returns {{ erro, status }|{ linha }}
+ */
+async function criarAgendamento(ctx, b, { usuario, ip = null }) {
+  const { db } = ctx;
+  if (!b.script_id && !b.biblioteca_id) return { erro: 'Informe script_id ou biblioteca_id', status: 400 };
+  if (b.script_id && b.biblioteca_id) return { erro: 'Informe só um: script_id ou biblioteca_id', status: 400 };
+  const { script, erro } = obterScript(ctx, b);
+  if (erro) return { erro, status: 404 };
+  if (b.tipo === 'intervalo' && !b.intervalo_min) return { erro: 'Informe intervalo_min pro tipo "intervalo"', status: 400 };
+  if (b.tipo === 'cron' && !b.cron) return { erro: 'Informe cron pro tipo "cron"', status: 400 };
+  let proxima;
+  try {
+    proxima = calcularProxima(b.tipo, { intervaloMin: b.intervalo_min, cron: b.cron }, Date.now());
+  } catch (e) { return { erro: e.message, status: 400 }; }
+  if (proxima == null) return { erro: 'Essa expressão cron nunca bate com nenhuma data nos próximos 2 anos', status: 400 };
+  // Alvo precisa resolver pelo menos uma vez pra não criar um agendamento morto por engano.
+  let resolvidos;
+  try { resolvidos = await ctx.alvos.resolver(b.alvo); } catch (e) { return { erro: e.message, status: 400 }; }
+  if (!resolvidos.length) return { erro: 'Nenhum dispositivo no alvo escolhido', status: 400 };
+
+  const agora = Date.now();
+  const r = db.prepare(`INSERT INTO agendamentos (nome, script_id, biblioteca_id, variaveis_json, timeout, alvo_json, tipo, intervalo_min, cron, ativo, proxima_execucao, criado_por, criado_em)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`)
+    .run(b.nome, b.script_id ?? null, b.biblioteca_id ?? null, Object.keys(b.variaveis ?? {}).length ? JSON.stringify(b.variaveis) : null,
+      b.timeout ?? null, JSON.stringify(b.alvo), b.tipo, b.intervalo_min ?? null, b.cron ?? null, proxima, usuario, agora);
+  const id = Number(r.lastInsertRowid);
+  ctx.auditar({ usuario, ip, acao: 'agendamento_criado', alvo: b.nome, detalhes: { id, script: script.nome, tipo: b.tipo, alvo: b.alvo } });
+  ctx.emitir('agendamento', { id, criado: true });
+  return { linha: linhaPublica(db.prepare('SELECT * FROM agendamentos WHERE id = ?').get(id)) };
+}
+
+/** Edita um agendamento existente (campos parciais). Usada por PUT /api/agendamentos/:id e por
+ * ctx.servicos.agendamentos.atualizar() (políticas reaplicadas atualizam em vez de duplicar). */
+async function atualizarAgendamento(ctx, id, b, { usuario, ip = null }) {
+  const { db } = ctx;
+  const atual = db.prepare('SELECT * FROM agendamentos WHERE id = ?').get(id);
+  if (!atual) return { erro: 'Agendamento não encontrado', status: 404 };
+  const novo = {
+    nome: b.nome ?? atual.nome,
+    script_id: b.script_id !== undefined ? b.script_id : atual.script_id,
+    biblioteca_id: b.biblioteca_id !== undefined ? b.biblioteca_id : atual.biblioteca_id,
+    variaveis_json: b.variaveis !== undefined ? (Object.keys(b.variaveis).length ? JSON.stringify(b.variaveis) : null) : atual.variaveis_json,
+    timeout: b.timeout !== undefined ? b.timeout : atual.timeout,
+    alvo_json: b.alvo !== undefined ? JSON.stringify(b.alvo) : atual.alvo_json,
+    tipo: b.tipo ?? atual.tipo,
+    intervalo_min: b.intervalo_min !== undefined ? b.intervalo_min : atual.intervalo_min,
+    cron: b.cron !== undefined ? b.cron : atual.cron,
+  };
+  if (b.script_id && b.biblioteca_id) return { erro: 'Informe só um: script_id ou biblioteca_id', status: 400 };
+  if (b.script_id) novo.biblioteca_id = null;
+  if (b.biblioteca_id) novo.script_id = null;
+  if (!novo.script_id && !novo.biblioteca_id) return { erro: 'Agendamento precisa de um script', status: 400 };
+  const { erro } = obterScript(ctx, novo);
+  if (erro) return { erro, status: 404 };
+  let proxima;
+  try {
+    proxima = calcularProxima(novo.tipo, { intervaloMin: novo.intervalo_min, cron: novo.cron }, Date.now());
+  } catch (e) { return { erro: e.message, status: 400 }; }
+  if (proxima == null) return { erro: 'Essa expressão cron nunca bate com nenhuma data nos próximos 2 anos', status: 400 };
+
+  db.prepare(`UPDATE agendamentos SET nome = ?, script_id = ?, biblioteca_id = ?, variaveis_json = ?, timeout = ?, alvo_json = ?,
+      tipo = ?, intervalo_min = ?, cron = ?, proxima_execucao = ? WHERE id = ?`)
+    .run(novo.nome, novo.script_id, novo.biblioteca_id, novo.variaveis_json, novo.timeout, novo.alvo_json,
+      novo.tipo, novo.intervalo_min, novo.cron, proxima, atual.id);
+  ctx.auditar({ usuario, ip, acao: 'agendamento_alterado', alvo: novo.nome, detalhes: { id: atual.id, ...b } });
+  ctx.emitir('agendamento', { id: atual.id, alterado: true });
+  return { linha: linhaPublica(db.prepare('SELECT * FROM agendamentos WHERE id = ?').get(atual.id)) };
+}
+
 /** Dispara um agendamento: cria os jobs (reaproveitando jobs.executar), grava o disparo e a auditoria,
  * e sempre recalcula a próxima execução (mesmo em erro — um script apagado não deve travar o agendamento
  * pra sempre; ele continua tentando e aparecendo com erro no histórico até alguém corrigir ou pausar). */
@@ -102,6 +174,14 @@ export default {
     CREATE INDEX ix_agendamentos_disparos ON agendamentos_disparos(agendamento_id, id DESC);`,
   ],
 
+  servico(ctx) {
+    return {
+      /** Ver criarAgendamento()/atualizarAgendamento() acima — é isto que políticas devem chamar. */
+      criar: (dados, opcoes) => criarAgendamento(ctx, dados, opcoes),
+      atualizar: (id, dados, opcoes) => atualizarAgendamento(ctx, id, dados, opcoes),
+    };
+  },
+
   aoIniciar(ctx) {
     // Roda a cada 20 s: baldes de 1 min no cron já tem folga de sobra pra não perder um disparo.
     ctx.agendador.registrar('agendamentos.disparar', 20_000, async (c, agora) => {
@@ -151,71 +231,18 @@ export default {
       preHandler: gerenciar,
       schema: { body: { type: 'object', additionalProperties: false, required: ['nome', 'alvo', 'tipo'], properties: corpoBase } },
     }, async (req, reply) => {
-      const b = req.body;
-      if (!b.script_id && !b.biblioteca_id) return reply.code(400).send({ erro: 'Informe script_id ou biblioteca_id' });
-      if (b.script_id && b.biblioteca_id) return reply.code(400).send({ erro: 'Informe só um: script_id ou biblioteca_id' });
-      const { script, erro } = await obterScript(ctx, b);
-      if (erro) return reply.code(404).send({ erro });
-      if (b.tipo === 'intervalo' && !b.intervalo_min) return reply.code(400).send({ erro: 'Informe intervalo_min pro tipo "intervalo"' });
-      if (b.tipo === 'cron' && !b.cron) return reply.code(400).send({ erro: 'Informe cron pro tipo "cron"' });
-      let proxima;
-      try {
-        proxima = calcularProxima(b.tipo, { intervaloMin: b.intervalo_min, cron: b.cron }, Date.now());
-      } catch (e) { return reply.code(400).send({ erro: e.message }); }
-      if (proxima == null) return reply.code(400).send({ erro: 'Essa expressão cron nunca bate com nenhuma data nos próximos 2 anos' });
-      // Alvo precisa resolver pelo menos uma vez pra não criar um agendamento morto por engano.
-      let resolvidos;
-      try { resolvidos = await ctx.alvos.resolver(b.alvo); } catch (e) { return reply.code(400).send({ erro: e.message }); }
-      if (!resolvidos.length) return reply.code(400).send({ erro: 'Nenhum dispositivo no alvo escolhido' });
-
-      const agora = Date.now();
-      const r = db.prepare(`INSERT INTO agendamentos (nome, script_id, biblioteca_id, variaveis_json, timeout, alvo_json, tipo, intervalo_min, cron, ativo, proxima_execucao, criado_por, criado_em)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`)
-        .run(b.nome, b.script_id ?? null, b.biblioteca_id ?? null, Object.keys(b.variaveis ?? {}).length ? JSON.stringify(b.variaveis) : null,
-          b.timeout ?? null, JSON.stringify(b.alvo), b.tipo, b.intervalo_min ?? null, b.cron ?? null, proxima, req.sessao.usuario, agora);
-      const id = Number(r.lastInsertRowid);
-      ctx.auditarReq(req, 'agendamento_criado', { alvo: b.nome, detalhes: { id, script: script.nome, tipo: b.tipo, alvo: b.alvo } });
-      ctx.emitir('agendamento', { id, criado: true });
-      return reply.code(201).send(linhaPublica(db.prepare('SELECT * FROM agendamentos WHERE id = ?').get(id)));
+      const r = await criarAgendamento(ctx, req.body, { usuario: req.sessao.usuario, ip: req.ip });
+      if (r.erro) return reply.code(r.status).send({ erro: r.erro });
+      return reply.code(201).send(r.linha);
     });
 
     app.put('/api/agendamentos/:id', {
       preHandler: gerenciar,
       schema: { params: PARAMS_ID, body: { type: 'object', additionalProperties: false, minProperties: 1, properties: corpoBase } },
     }, async (req, reply) => {
-      const atual = db.prepare('SELECT * FROM agendamentos WHERE id = ?').get(req.params.id);
-      if (!atual) return reply.code(404).send({ erro: 'Agendamento não encontrado' });
-      const b = req.body;
-      const novo = {
-        nome: b.nome ?? atual.nome,
-        script_id: b.script_id !== undefined ? b.script_id : atual.script_id,
-        biblioteca_id: b.biblioteca_id !== undefined ? b.biblioteca_id : atual.biblioteca_id,
-        variaveis_json: b.variaveis !== undefined ? (Object.keys(b.variaveis).length ? JSON.stringify(b.variaveis) : null) : atual.variaveis_json,
-        timeout: b.timeout !== undefined ? b.timeout : atual.timeout,
-        alvo_json: b.alvo !== undefined ? JSON.stringify(b.alvo) : atual.alvo_json,
-        tipo: b.tipo ?? atual.tipo,
-        intervalo_min: b.intervalo_min !== undefined ? b.intervalo_min : atual.intervalo_min,
-        cron: b.cron !== undefined ? b.cron : atual.cron,
-      };
-      if (b.script_id && b.biblioteca_id) return reply.code(400).send({ erro: 'Informe só um: script_id ou biblioteca_id' });
-      if (b.script_id) novo.biblioteca_id = null;
-      if (b.biblioteca_id) novo.script_id = null;
-      if (!novo.script_id && !novo.biblioteca_id) return reply.code(400).send({ erro: 'Agendamento precisa de um script' });
-      const { erro } = await obterScript(ctx, novo);
-      if (erro) return reply.code(404).send({ erro });
-      let proxima;
-      try {
-        proxima = calcularProxima(novo.tipo, { intervaloMin: novo.intervalo_min, cron: novo.cron }, Date.now());
-      } catch (e) { return reply.code(400).send({ erro: e.message }); }
-      if (proxima == null) return reply.code(400).send({ erro: 'Essa expressão cron nunca bate com nenhuma data nos próximos 2 anos' });
-
-      db.prepare(`UPDATE agendamentos SET nome = ?, script_id = ?, biblioteca_id = ?, variaveis_json = ?, timeout = ?, alvo_json = ?,
-          tipo = ?, intervalo_min = ?, cron = ?, proxima_execucao = ? WHERE id = ?`)
-        .run(novo.nome, novo.script_id, novo.biblioteca_id, novo.variaveis_json, novo.timeout, novo.alvo_json,
-          novo.tipo, novo.intervalo_min, novo.cron, proxima, atual.id);
-      ctx.auditarReq(req, 'agendamento_alterado', { alvo: novo.nome, detalhes: { id: atual.id, ...b } });
-      ctx.emitir('agendamento', { id: atual.id, alterado: true });
-      return linhaPublica(db.prepare('SELECT * FROM agendamentos WHERE id = ?').get(atual.id));
+      const r = await atualizarAgendamento(ctx, req.params.id, req.body, { usuario: req.sessao.usuario, ip: req.ip });
+      if (r.erro) return reply.code(r.status).send({ erro: r.erro });
+      return r.linha;
     });
 
     app.post('/api/agendamentos/:id/pausar', { preHandler: gerenciar, schema: { params: PARAMS_ID } }, async (req, reply) => {
