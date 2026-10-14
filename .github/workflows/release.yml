@@ -1,0 +1,101 @@
+name: release
+
+# Gera os executáveis e o instalador do Windows e publica um GitHub Release com nomes fixos,
+# para o site poder usar https://github.com/<dono>/<repo>/releases/latest/download/<nome>.
+#   - tag v*            : cria/atualiza o release dessa tag (a versão vem da tag)
+#   - workflow_dispatch : roda o build; informe "tag" para publicar, ou deixe vazio para só baixar os artefatos
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag do release (ex.: v2.1.0). Vazio = só gera os artefatos, sem publicar.'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    env:
+      # Assinatura de código opcional: sem estes dois secrets o passo é pulado e os exes saem sem assinatura.
+      CERT_PFX_BASE64: ${{ secrets.CERT_PFX_BASE64 }}
+      CERT_SENHA: ${{ secrets.CERT_SENHA }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Definir a versão
+        shell: pwsh
+        run: |
+          $tag = if ('${{ github.ref_type }}' -eq 'tag') { '${{ github.ref_name }}' } else { '${{ inputs.tag }}' }
+          if ($tag) {
+            $v = $tag -replace '^v', ''
+            if ($v -notmatch '^\d+\.\d+\.\d+$') { throw "Tag '$tag' fora do padrão vX.Y.Z" }
+            Set-Content -Path empacotamento/VERSION -Value $v -NoNewline
+          }
+          "TAG=$tag" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "Versão do build: $(Get-Content empacotamento/VERSION)"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Dependências de build
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pyinstaller pywin32 psutil pillow
+          choco install innosetup --no-progress -y
+
+      - name: Testes (servidor e agente)
+        shell: pwsh
+        run: |
+          python -m unittest discover -s agente/testes
+          Push-Location servidor; npm ci --no-audit --no-fund; npm test; Pop-Location
+
+      - name: Assinatura de código (opcional)
+        shell: pwsh
+        if: ${{ env.CERT_PFX_BASE64 != '' && env.CERT_SENHA != '' }}
+        run: Write-Host "Certificado encontrado - o build.ps1 assina os executáveis e o Setup."
+
+      - name: Gerar executáveis e instalador
+        shell: pwsh
+        run: powershell -ExecutionPolicy Bypass -File empacotamento\build.ps1
+
+      - name: Conferir os arquivos gerados
+        shell: pwsh
+        run: |
+          $r = 'empacotamento\dist\release'
+          foreach ($n in 'FarolAgenteSetup.exe', 'farol-agente.exe', 'farol-servidor.exe', 'SHA256SUMS.txt') {
+            if (-not (Test-Path "$r\$n")) { throw "Faltou $n" }
+          }
+          if (-not (Test-Path "$r\farol-bandeja.exe")) { Write-Warning 'farol-bandeja.exe não foi gerado (agente/farol_bandeja.py ausente).' }
+          & "$r\farol-agente.exe" versao
+          & "$r\farol-servidor.exe" versao
+          Get-Content "$r\SHA256SUMS.txt"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: farol-windows
+          path: empacotamento/dist/release/*
+
+      - name: Publicar o GitHub Release
+        if: ${{ env.TAG != '' }}
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $arquivos = Get-ChildItem empacotamento\dist\release | ForEach-Object { $_.FullName }
+          gh release view $env:TAG *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $env:TAG @arquivos --clobber
+          } else {
+            gh release create $env:TAG @arquivos --title "Farol RMM $env:TAG" --generate-notes --target ${{ github.sha }}
+          }

@@ -1,0 +1,182 @@
+/* =============================================================================
+   Farol — tokens do design system (camada 1 de 5)
+   Identidade: luz âmbar de farol sobre azul-petróleo profundo.
+   Tema escuro é o padrão; o claro é selecionado (não é inversão automática).
+   Componentes NUNCA usam cor crua: só estes tokens.
+   ============================================================================= */
+:root {
+  color-scheme: dark;
+
+  /* ---- marca ---- */
+  --marca: #ff9a2e;            /* âmbar-laranja do farol: ações primárias, item ativo, foco */
+  --marca-forte: #ffb259;
+  --marca-tinta: #1d1003;      /* texto sobre a cor da marca */
+  --marca-lavagem: rgba(255, 154, 46, 0.12);
+  --marca-lavagem-forte: rgba(255, 154, 46, 0.2);
+  --marca-brilho: rgba(255, 154, 46, 0.35);
+  --gradiente-marca: linear-gradient(180deg, #ffad4f 0%, #ff9124 100%);
+
+  /* ---- superfícies (camadas com elevação sutil, nunca preto chapado) ---- */
+  --fundo: #081217;            /* plano da página */
+  --fundo-lateral: #0a161c;    /* barra lateral */
+  --superficie-0: #0b171d;     /* campos, poços (abaixo do cartão) */
+  --superficie-1: #0f1d24;     /* cartões, tabelas */
+  --superficie-2: #14262e;     /* hover, cabeçalhos, elevados */
+  --superficie-3: #1a2f38;     /* popovers, menus, modais */
+  --superficie-4: #213a44;     /* hover dentro de popovers */
+  --cortina: rgba(3, 9, 12, 0.66);
+
+  /* ---- bordas (1px translúcidas) ---- */
+  --borda: rgba(255, 255, 255, 0.07);
+  --borda-forte: rgba(255, 255, 255, 0.12);
+  --borda-foco: var(--marca);
+  --realce-topo: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+
+  /* ---- texto ---- */
+  --texto-1: #e9f1f3;
+  --texto-2: #a8bcc3;
+  --texto-3: #74898f;          /* rótulos, eixos, metadados */
+  --texto-desabilitado: #4d5f65;
+  --link: #ffb259;
+
+  /* ---- estados (reservados: sempre com ícone + rótulo) ---- */
+  --ok: #2bb673;
+  --ok-lavagem: rgba(43, 182, 115, 0.14);
+  --aviso: #f2c94c;
+  --aviso-lavagem: rgba(242, 201, 76, 0.14);
+  --critico: #ef5350;
+  --critico-lavagem: rgba(239, 83, 80, 0.14);
+  --info: #4c9be8;
+  --info-lavagem: rgba(76, 155, 232, 0.14);
+  --neutro: #6b7f86;
+  --neutro-lavagem: rgba(107, 127, 134, 0.16);
+
+  /* ---- dados (validados com o dataviz: 3 slots passam todos os pares) ---- */
+  --serie-1: #3987e5;
+  --serie-2: #d95926;
+  --serie-3: #199e70;
+  --serie-area: rgba(57, 135, 229, 0.12);
+  --grafico-grade: rgba(255, 255, 255, 0.06);
+  --grafico-eixo: rgba(255, 255, 255, 0.14);
+  --grafico-trilho: rgba(255, 255, 255, 0.07);
+
+  /* ---- tipografia (fonte do sistema) ---- */
+  --fonte: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --fonte-mono: ui-monospace, "Cascadia Code", "SF Mono", Consolas, "Liberation Mono", monospace;
+  --t-11: 0.6875rem;
+  --t-12: 0.75rem;
+  --t-13: 0.8125rem;
+  --t-14: 0.875rem;
+  --t-16: 1rem;
+  --t-18: 1.125rem;
+  --t-22: 1.375rem;
+  --t-28: 1.75rem;
+  --t-40: 2.5rem;
+  --peso-normal: 400;
+  --peso-medio: 500;
+  --peso-forte: 600;
+  --altura-linha: 1.5;
+
+  /* ---- espaço (escala de 4px) ---- */
+  --e-1: 4px;
+  --e-2: 8px;
+  --e-3: 12px;
+  --e-4: 16px;
+  --e-5: 20px;
+  --e-6: 24px;
+  --e-8: 32px;
+  --e-10: 40px;
+  --e-12: 48px;
+
+  /* ---- forma ---- */
+  --raio-1: 5px;
+  --raio-2: 7px;
+  --raio-3: 10px;
+  --raio-4: 14px;
+  --raio-pilula: 999px;
+
+  /* ---- elevação ---- */
+  --sombra-1: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --sombra-2: 0 6px 18px -6px rgba(0, 0, 0, 0.5), 0 2px 4px rgba(0, 0, 0, 0.25);
+  --sombra-3: 0 24px 60px -12px rgba(0, 0, 0, 0.65), 0 8px 16px -8px rgba(0, 0, 0, 0.4);
+  --anel-foco: 0 0 0 2px var(--fundo), 0 0 0 4px var(--marca);
+
+  /* ---- movimento ---- */
+  --dur-1: 120ms;
+  --dur-2: 160ms;
+  --dur-3: 200ms;
+  --curva: cubic-bezier(0.2, 0.7, 0.2, 1);
+
+  /* ---- barra lateral (escura nos dois temas) ---- */
+  --lateral-texto: #c4d2d7;
+  --lateral-texto-forte: #f1f6f7;
+  --lateral-texto-3: #6c838a;
+  --lateral-hover: rgba(255, 255, 255, 0.045);
+  --lateral-ativo: rgba(255, 154, 46, 0.11);
+  --lateral-borda: rgba(255, 255, 255, 0.06);
+
+  /* ---- layout ---- */
+  --lateral-largura: 244px;
+  --lateral-recolhida: 64px;
+  --topo-altura: 56px;
+  --linha-tabela: 40px;
+  --conteudo-max: 1600px;
+}
+
+/* ---------------------------- tema claro ---------------------------- */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --marca: #f08a12;
+  --marca-forte: #d97706;
+  --marca-tinta: #1d1003;
+  --marca-lavagem: rgba(240, 138, 18, 0.1);
+  --marca-lavagem-forte: rgba(240, 138, 18, 0.18);
+  --marca-brilho: rgba(240, 138, 18, 0.28);
+  --gradiente-marca: linear-gradient(180deg, #ffa23d 0%, #f28a14 100%);
+
+  --fundo: #f3f6f7;
+  --fundo-lateral: #0d1f26;     /* lateral continua escura: assinatura do Farol */
+  --superficie-0: #f7f9fa;
+  --superficie-1: #ffffff;
+  --superficie-2: #f2f6f7;
+  --superficie-3: #ffffff;
+  --superficie-4: #eef3f5;
+  --cortina: rgba(13, 31, 38, 0.38);
+
+  --borda: rgba(13, 40, 50, 0.09);
+  --borda-forte: rgba(13, 40, 50, 0.16);
+  --realce-topo: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+
+  --texto-1: #0e1d23;
+  --texto-2: #46595f;
+  --texto-3: #6a7d83;
+  --texto-desabilitado: #a3b1b6;
+  --link: #b45f00;
+
+  --ok: #12985a;
+  --ok-lavagem: rgba(18, 152, 90, 0.1);
+  --aviso: #b88600;
+  --aviso-lavagem: rgba(230, 170, 0, 0.14);
+  --critico: #d93b38;
+  --critico-lavagem: rgba(217, 59, 56, 0.09);
+  --info: #2a78d6;
+  --info-lavagem: rgba(42, 120, 214, 0.09);
+  --neutro: #7b8b90;
+  --neutro-lavagem: rgba(123, 139, 144, 0.13);
+
+  --serie-1: #2a78d6;
+  --serie-2: #eb6834;
+  --serie-3: #1baf7a;
+  --serie-area: rgba(42, 120, 214, 0.1);
+  --grafico-grade: rgba(13, 40, 50, 0.07);
+  --grafico-eixo: rgba(13, 40, 50, 0.18);
+  --grafico-trilho: rgba(13, 40, 50, 0.07);
+
+  --sombra-1: 0 1px 2px rgba(13, 40, 50, 0.06);
+  --sombra-2: 0 8px 20px -8px rgba(13, 40, 50, 0.18), 0 2px 4px rgba(13, 40, 50, 0.06);
+  --sombra-3: 0 28px 64px -16px rgba(13, 40, 50, 0.3), 0 8px 16px -8px rgba(13, 40, 50, 0.12);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --dur-1: 0ms; --dur-2: 0ms; --dur-3: 0ms; }
+}
