@@ -13,7 +13,7 @@ import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
 import { transacao } from '../../db.js';
 import { lerConfig, definirConfig } from '../../db.js';
-import { PARAMS_ID, filtroEscopo, ESCOPO_QUERY, like } from '../../nucleo/util.js';
+import { PARAMS_ID, ID_AGENTE, filtroEscopo, ESCOPO_QUERY, like } from '../../nucleo/util.js';
 
 export const STATUS = ['aberto', 'em_andamento', 'aguardando_usuario', 'resolvido', 'fechado'];
 export const PRIORIDADES = ['baixa', 'normal', 'alta', 'urgente'];
@@ -157,6 +157,7 @@ export default {
         prioridade: { type: 'string', enum: PRIORIDADES },
         categoria: { type: 'string', enum: CATEGORIAS },
         tecnico: { type: 'string', maxLength: 120 },
+        agente: ID_AGENTE,
         q: { type: 'string', maxLength: 200 },
         limite: { type: 'integer', minimum: 1, maximum: 1000, default: 300 },
         ...ESCOPO_QUERY,
@@ -171,6 +172,7 @@ export default {
       if (q.prioridade) { onde.push('c.prioridade = ?'); args.push(q.prioridade); }
       if (q.categoria) { onde.push('c.categoria = ?'); args.push(q.categoria); }
       if (q.tecnico) { onde.push('c.tecnico = ?'); args.push(q.tecnico); }
+      if (q.agente) { onde.push('c.agente_id = ?'); args.push(q.agente); }
       if (q.q) { onde.push("(c.assunto LIKE ? ESCAPE '\\' OR a.hostname LIKE ? ESCAPE '\\')"); args.push(like(q.q), like(q.q)); }
       const where = `WHERE a.revogado = 0${onde.length ? ` AND ${onde.join(' AND ')}` : ''}${f.sql}`;
       const linhas = db.prepare(`SELECT c.*, a.hostname, a.site_id, s.nome AS site_nome, s.cliente_id

@@ -121,3 +121,21 @@ test('isolamento: um agente não vê nem acessa chamado de outro', async () => {
   const todos = (await admin.c.get('/api/chamados?status=todos')).json;
   assert.equal(todos.length, 1); // só o do A foi criado
 });
+
+test('filtro por agente: a aba Chamados do detalhe do dispositivo só vê os chamados dele', async () => {
+  const { app, db } = await novoApp();
+  const admin = await adminElevado(app, db);
+  const agA = await registrarAgente(app, admin.c, { hostname: 'pc-a', so: 'Windows', so_versao: '11', arquitetura: 'AMD64', versao_agente: '2.0.0' });
+  const agB = await registrarAgente(app, admin.c, { hostname: 'pc-b', so: 'Windows', so_versao: '11', arquitetura: 'AMD64', versao_agente: '2.0.0' });
+  await ag(app, agA.auth, 'criar', { assunto: 'chamado do A', descricao: 'desc' });
+  await ag(app, agB.auth, 'criar', { assunto: 'chamado do B 1', descricao: 'desc' });
+  await ag(app, agB.auth, 'criar', { assunto: 'chamado do B 2', descricao: 'desc' });
+
+  const doA = (await admin.c.get(`/api/chamados?status=todos&agente=${agA.id}`)).json;
+  assert.equal(doA.length, 1);
+  assert.equal(doA[0].assunto, 'chamado do A');
+
+  const doB = (await admin.c.get(`/api/chamados?status=todos&agente=${agB.id}`)).json;
+  assert.equal(doB.length, 2);
+  assert.ok(doB.every((c) => c.agente_id === agB.id));
+});

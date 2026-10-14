@@ -46,9 +46,12 @@ test('agregação: camadas de 1 h e 1 dia também são preenchidas a partir do m
   const { c } = await adminElevado(app, db, { elevar: false });
   const ag = await registrarAgente(app, c);
 
+  // 30h atrás: margem de sobra pra garantir que tanto o balde de hora quanto o de DIA já estejam
+  // fechados não importa a hora do dia em que o teste rodar (achar "5h atrás" quase sempre funciona,
+  // mas falha sempre que o teste roda de madrugada em UTC e "5h atrás" cai ainda dentro de hoje).
   const agora = Date.now();
-  const inicioHora = Math.floor((agora - 5 * HORA) / HORA) * HORA;
-  const inicioDia = Math.floor((agora - 5 * HORA) / DIA) * DIA;
+  const inicioHora = Math.floor((agora - 30 * HORA) / HORA) * HORA;
+  const inicioDia = Math.floor((agora - 30 * HORA) / DIA) * DIA;
   inserirPontos(db, ag.id, [0, 10, 20, 30].map((i) => ({ ts: inicioHora + i * MIN, cpu: 50, ram: 60, disco: 70 })));
 
   await ctx.agendador.executar('agentes.metricas_agregar', agora);
