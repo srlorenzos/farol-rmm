@@ -95,8 +95,8 @@ export function abaMonitoramento(el, { agente: a }) {
     } catch (e) { toastErro(e); }
   };
   el.append(h('div', { class: 'linha-entre mb-4' },
-    h('p', { class: 'muted pequeno', text: 'Histórico com um ponto por minuto, guardado por 7 dias. A linha vermelha marca o limite de alerta.' }),
-    segmentado([[1, '1 h'], [24, '24 h'], [168, '7 dias']], horas, (v) => { horas = Number(v); desenhar(); }, 'Período')), graficos);
+    h('p', { class: 'muted pequeno', text: 'Ponto a ponto por 48 h; depois, médias agregadas automaticamente (15 min por 14 dias, horárias por 90 dias, diárias por 1 ano). A linha vermelha marca o limite de alerta.' }),
+    segmentado([[1, '1 h'], [24, '24 h'], [168, '7 dias'], [720, '30 dias'], [2160, '90 dias']], horas, (v) => { horas = Number(v); desenhar(); }, 'Período')), graficos);
   desenhar();
 }
 

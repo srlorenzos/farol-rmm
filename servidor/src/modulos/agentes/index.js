@@ -7,13 +7,97 @@
 //      + o que os ganchos tarefasAgente devolverem (ex.: { jobs: [...] } do módulo jobs).
 import { randomUUID } from 'node:crypto';
 import { gerarToken, sha256 } from '../../seguranca.js';
-import { transacao } from '../../db.js';
+import { transacao, lerConfig, definirConfig } from '../../db.js';
 import { PARAMS_ID, PARAMS_AGENTE, filtroEscopo, ESCOPO_QUERY } from '../../nucleo/util.js';
 import { pacoteAgente } from './pacote.js';
 
 const INTERVALO_AMOSTRA = 60_000; // no máx. 1 ponto de histórico por minuto por agente
 const INVENTARIO_VALIDADE = 3600_000;
 const RESERVADAS = new Set(['intervalo', 'pedirInventario', 'comandos', 'tempoReal']);
+
+// ======================================================================================
+// Downsampling do histórico de métricas: granularidade fina (1 ponto/min) só por pouco
+// tempo (retencaoMetricas.finaHoras); em paralelo, três tarefas periódicas agregam o bruto
+// em camadas cada vez mais grossas — 15 min, 1 h, 1 dia — cada uma com min/max/média/p95,
+// guardadas por mais tempo (14 d / 90 d / 365 d). A rota de histórico escolhe sozinha qual
+// tabela servir conforme o período pedido, pra nunca mandar milhares de pontos crus ao
+// navegador. Ver `agregarTier` e a rota GET /api/agentes/:id/metricas mais abaixo.
+const CAMADAS = [
+  { tabela: 'metricas_15m', ms: 900_000, marca: 'metricas_marca_15m' },
+  { tabela: 'metricas_1h', ms: 3_600_000, marca: 'metricas_marca_1h' },
+  { tabela: 'metricas_1d', ms: 86_400_000, marca: 'metricas_marca_1d' },
+];
+const MAX_BALDES_POR_EXECUCAO = 400; // proteção: nunca processa mais que isso de uma vez (catch-up gradual)
+
+/** Percentil 95 por "nearest rank" — simples e suficiente pra um painel de monitoramento. */
+function p95(valores) {
+  if (!valores.length) return null;
+  const v = [...valores].sort((a, b) => a - b);
+  return v[Math.min(v.length - 1, Math.max(0, Math.ceil(0.95 * v.length) - 1))];
+}
+
+/** Agrega as linhas cruas de um balde (já agrupadas por agente) e grava/atualiza a linha da camada. */
+function gravarBalde(db, tabela, agenteId, inicioBalde, linhas) {
+  const dados = (campo) => linhas.map((l) => l[campo]).filter((x) => x != null);
+  const media = (arr) => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null);
+  const minMax = (arr) => (arr.length ? [Math.min(...arr), Math.max(...arr)] : [null, null]);
+  const [cpuMin, cpuMax] = minMax(dados('cpu'));
+  const [ramMin, ramMax] = minMax(dados('ram_pct'));
+  const [discoMin, discoMax] = minMax(dados('disco_pct'));
+  db.prepare(`INSERT INTO ${tabela}
+      (agente_id, ts, n, cpu_min, cpu_max, cpu_avg, cpu_p95, ram_min, ram_max, ram_avg, ram_p95, disco_min, disco_max, disco_avg, disco_p95)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT (agente_id, ts) DO UPDATE SET n = excluded.n,
+      cpu_min = excluded.cpu_min, cpu_max = excluded.cpu_max, cpu_avg = excluded.cpu_avg, cpu_p95 = excluded.cpu_p95,
+      ram_min = excluded.ram_min, ram_max = excluded.ram_max, ram_avg = excluded.ram_avg, ram_p95 = excluded.ram_p95,
+      disco_min = excluded.disco_min, disco_max = excluded.disco_max, disco_avg = excluded.disco_avg, disco_p95 = excluded.disco_p95`)
+    .run(agenteId, inicioBalde, linhas.length,
+      cpuMin, cpuMax, media(dados('cpu')), p95(dados('cpu')),
+      ramMin, ramMax, media(dados('ram_pct')), p95(dados('ram_pct')),
+      discoMin, discoMax, media(dados('disco_pct')), p95(dados('disco_pct')));
+}
+
+/**
+ * Agrega, direto da tabela `metricas` (dado cru), todos os baldes já fechados de uma camada que ainda
+ * não foram processados (watermark em `config`). Sempre a partir do dado cru: como a agregação roda a
+ * cada poucos minutos e o cru fica guardado por `finaHoras` (48 h por padrão), mesmo a camada diária tem
+ * dado cru disponível quando processa o dia anterior — então min/max/p95 são exatos, nunca aproximados
+ * a partir de uma camada mais grossa. Se o watermark ficou pra trás de tudo que ainda existe de cru
+ * (servidor ficou off por muito tempo, ou o cru já foi podado), pula direto pro dado mais antigo
+ * disponível — nunca trava tentando agregar um intervalo que não tem mais dado nenhum.
+ */
+function agregarTier(ctx, { tabela, ms, marca: chaveMarca }, agora) {
+  const { db } = ctx;
+  const minCru = db.prepare('SELECT MIN(ts) AS t FROM metricas').get().t;
+  if (minCru == null) return 0; // nada pra agregar ainda
+  let marca = Number(lerConfig(db, chaveMarca, 0)) || Math.floor(minCru / ms) * ms;
+  const minAlinhado = Math.floor(minCru / ms) * ms;
+  if (marca < minAlinhado) marca = minAlinhado;
+  const fechado = Math.floor(agora / ms) * ms; // o balde corrente ainda está aberto: não agrega
+  let processados = 0;
+  while (marca < fechado && processados < MAX_BALDES_POR_EXECUCAO) {
+    const linhas = db.prepare('SELECT agente_id, cpu, ram_pct, disco_pct FROM metricas WHERE ts >= ? AND ts < ? ORDER BY agente_id').all(marca, marca + ms);
+    if (linhas.length) {
+      const porAgente = new Map();
+      for (const l of linhas) { if (!porAgente.has(l.agente_id)) porAgente.set(l.agente_id, []); porAgente.get(l.agente_id).push(l); }
+      const inicioBalde = marca;
+      transacao(db, () => { for (const [agenteId, ls] of porAgente) gravarBalde(db, tabela, agenteId, inicioBalde, ls); });
+    }
+    marca += ms;
+    processados++;
+  }
+  if (processados) definirConfig(db, chaveMarca, marca);
+  return processados;
+}
+
+/** Granularidade certa pra servir o período pedido: nunca manda milhares de pontos crus ao navegador. */
+function granularidadeParaHoras(horas) {
+  if (horas <= 2) return { bruto: true, baldeMs: 60_000 }; // 1 ponto/min — até 120 pontos
+  if (horas <= 48) return { bruto: true, baldeMs: 300_000 }; // 5 min — dentro da retenção fina, até ~576 pontos
+  if (horas <= 336) return { bruto: false, tabela: 'metricas_15m', baldeMs: 900_000 }; // até 14 dias: até ~1344 pontos
+  if (horas <= 2160) return { bruto: false, tabela: 'metricas_1h', baldeMs: 3_600_000 }; // até 90 dias: até 2160 pontos
+  return { bruto: false, tabela: 'metricas_1d', baldeMs: 86_400_000 }; // até 365 dias: até 365 pontos
+}
 
 const txt = (max) => ({ type: 'string', maxLength: max });
 const num = { type: 'number' };
@@ -102,6 +186,36 @@ export default {
     'dispositivos.revogar': { descricao: 'Revogar dispositivos' },
     'dispositivos.energia': { descricao: 'Reiniciar e desligar dispositivos', papeis: ['tecnico'] },
   },
+
+  migracoes: [
+    // 1 — downsampling do histórico de métricas: índice por ts (a agregação varre todos os agentes
+    // num intervalo de tempo, não um agente só) + as três camadas agregadas (ver CAMADAS acima).
+    `CREATE INDEX IF NOT EXISTS ix_metricas_ts ON metricas(ts);
+    CREATE TABLE metricas_15m (
+      agente_id TEXT NOT NULL REFERENCES agentes(id) ON DELETE CASCADE,
+      ts INTEGER NOT NULL, n INTEGER NOT NULL,
+      cpu_min REAL, cpu_max REAL, cpu_avg REAL, cpu_p95 REAL,
+      ram_min REAL, ram_max REAL, ram_avg REAL, ram_p95 REAL,
+      disco_min REAL, disco_max REAL, disco_avg REAL, disco_p95 REAL,
+      PRIMARY KEY (agente_id, ts)
+    );
+    CREATE TABLE metricas_1h (
+      agente_id TEXT NOT NULL REFERENCES agentes(id) ON DELETE CASCADE,
+      ts INTEGER NOT NULL, n INTEGER NOT NULL,
+      cpu_min REAL, cpu_max REAL, cpu_avg REAL, cpu_p95 REAL,
+      ram_min REAL, ram_max REAL, ram_avg REAL, ram_p95 REAL,
+      disco_min REAL, disco_max REAL, disco_avg REAL, disco_p95 REAL,
+      PRIMARY KEY (agente_id, ts)
+    );
+    CREATE TABLE metricas_1d (
+      agente_id TEXT NOT NULL REFERENCES agentes(id) ON DELETE CASCADE,
+      ts INTEGER NOT NULL, n INTEGER NOT NULL,
+      cpu_min REAL, cpu_max REAL, cpu_avg REAL, cpu_p95 REAL,
+      ram_min REAL, ram_max REAL, ram_avg REAL, ram_p95 REAL,
+      disco_min REAL, disco_max REAL, disco_avg REAL, disco_p95 REAL,
+      PRIMARY KEY (agente_id, ts)
+    );`,
+  ],
 
   servico(ctx) {
     const enriquecedores = [];
@@ -286,15 +400,23 @@ export default {
 
     app.get('/api/agentes/:id/metricas', {
       preHandler: ver,
-      schema: { params: PARAMS_AGENTE, querystring: { type: 'object', properties: { horas: { type: 'integer', minimum: 1, maximum: 168, default: 24 } } } },
+      // 8760 h = 365 dias: cobre a maior camada agregada (diária, guardada por 1 ano por padrão).
+      schema: { params: PARAMS_AGENTE, querystring: { type: 'object', properties: { horas: { type: 'integer', minimum: 1, maximum: 8760, default: 24 } } } },
     }, async (req) => {
       const horas = req.query.horas;
-      const balde = horas <= 1 ? 60_000 : horas <= 24 ? 300_000 : 1_800_000;
       const desde = Date.now() - horas * 3600_000;
-      const pontos = db.prepare(`SELECT (ts / ?) * ? AS t, AVG(cpu) AS cpu, AVG(ram_pct) AS ram, AVG(disco_pct) AS disco
-        FROM metricas WHERE agente_id = ? AND ts >= ? GROUP BY ts / ? ORDER BY t`)
-        .all(balde, balde, req.params.id, desde, balde);
-      return { horas, baldeMs: balde, desde, pontos };
+      const g = granularidadeParaHoras(horas);
+      const pontos = g.bruto
+        ? db.prepare(`SELECT (ts / ?) * ? AS t, MIN(cpu) AS cpu_min, MAX(cpu) AS cpu_max, AVG(cpu) AS cpu,
+              MIN(ram_pct) AS ram_min, MAX(ram_pct) AS ram_max, AVG(ram_pct) AS ram,
+              MIN(disco_pct) AS disco_min, MAX(disco_pct) AS disco_max, AVG(disco_pct) AS disco
+            FROM metricas WHERE agente_id = ? AND ts >= ? GROUP BY ts / ? ORDER BY t`)
+          .all(g.baldeMs, g.baldeMs, req.params.id, desde, g.baldeMs)
+        : db.prepare(`SELECT ts AS t, cpu_min, cpu_max, cpu_avg AS cpu, cpu_p95, ram_min, ram_max, ram_avg AS ram, ram_p95,
+              disco_min, disco_max, disco_avg AS disco, disco_p95
+            FROM ${g.tabela} WHERE agente_id = ? AND ts >= ? ORDER BY ts`)
+          .all(req.params.id, desde);
+      return { horas, baldeMs: g.baldeMs, desde, granularidade: g.bruto ? 'bruto' : g.tabela.replace('metricas_', ''), pontos };
     });
 
     app.put('/api/agentes/:id', {
@@ -427,8 +549,24 @@ export default {
         ctx.emitir('agente', { id: a.id, hostname: a.hostname, status: 'offline' });
       }
     });
+    // Agrega o histórico bruto nas três camadas (15 min / 1 h / 1 dia) a cada 5 min — baldes já fechados
+    // e ainda não processados (watermark por camada). Ver `agregarTier` acima.
+    ctx.agendador.registrar('agentes.metricas_agregar', 300_000, (c, agora) => {
+      for (const camada of CAMADAS) agregarTier(c, camada, agora);
+    }, { imediato: true });
+
     ctx.agendador.registrar('agentes.limpeza', 3600_000, ({ db, config }, agora) => {
-      db.prepare('DELETE FROM metricas WHERE ts < ?').run(agora - config.retencaoMetricasDias * 86400_000);
+      const r = config.retencaoMetricas;
+      // Nunca poda dado cru que uma camada ainda não processou (watermark) — mesmo que finaHoras já
+      // tenha vencido. Em operação normal o watermark está sempre bem à frente desse piso.
+      // Watermark desconhecido (camada nunca rodou ainda) vale 0 — protege TUDO até a primeira agregação,
+      // em vez de confiar no corte por idade sozinho (que apagaria dado que nenhuma camada processou).
+      const marcas = CAMADAS.map((c) => Number(lerConfig(db, c.marca, 0)));
+      const piso = Math.min(agora - r.finaHoras * 3600_000, ...marcas);
+      db.prepare('DELETE FROM metricas WHERE ts < ?').run(piso);
+      db.prepare('DELETE FROM metricas_15m WHERE ts < ?').run(agora - r.quinzeMinDias * 86400_000);
+      db.prepare('DELETE FROM metricas_1h WHERE ts < ?').run(agora - r.horaDias * 86400_000);
+      db.prepare('DELETE FROM metricas_1d WHERE ts < ?').run(agora - r.diaDias * 86400_000);
       db.prepare('DELETE FROM tokens_instalacao WHERE usado_em IS NULL AND expira_em < ?').run(agora - 7 * 86400_000);
       db.prepare("DELETE FROM comandos WHERE status NOT IN ('pendente', 'enviado') AND criado_em < ?").run(agora - 7 * 86400_000);
     }, { imediato: true });

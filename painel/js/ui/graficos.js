@@ -59,7 +59,14 @@ function svgLinha({ titulo, dados, desde, ate, baldeMs, largura, dica, area, lim
       s('text', { class: 'eixo-rotulo', x: MARGEM.esquerda - 8, y: y(v) + 4, 'text-anchor': 'end' }, `${v}${unidade}`));
   }
   const janela = ate - desde;
-  const passoX = janela > 48 * 3600_000 ? 24 * 3600_000 : janela > 6 * 3600_000 ? 4 * 3600_000 : janela > 2 * 3600_000 ? 3600_000 : 15 * 60_000;
+  // Acima de 14 dias (janelas de 30/90 dias só existem desde a agregação em camadas), 1 rótulo por dia
+  // fica apertado demais — espaça mais pra manter uns 10-13 rótulos legíveis em vez de lotar o eixo.
+  const passoX = janela > 120 * 86400_000 ? 30 * 86400_000
+    : janela > 45 * 86400_000 ? 7 * 86400_000
+    : janela > 14 * 86400_000 ? 3 * 86400_000
+    : janela > 48 * 3600_000 ? 24 * 3600_000
+    : janela > 6 * 3600_000 ? 4 * 3600_000
+    : janela > 2 * 3600_000 ? 3600_000 : 15 * 60_000;
   const fuso = new Date().getTimezoneOffset() * 60_000;
   for (let t = Math.ceil((desde - fuso) / passoX) * passoX + fuso; t <= ate; t += passoX) {
     const px = x(t);

@@ -46,7 +46,14 @@ export function carregarConfig(sobrescrever = {}) {
     sessaoHoras: Number(env.SESSAO_HORAS || 12),
     offlineSegundos: 60,
     intervaloCheckin: 15,
-    retencaoMetricasDias: 7,
+    // Retenção em camadas do histórico de métricas (downsampling): granularidade fina só por pouco tempo,
+    // depois agregações cada vez mais grossas guardadas por mais tempo. Ver agentes/index.js (agregarTier).
+    retencaoMetricas: {
+      finaHoras: Number(env.RETENCAO_METRICAS_FINA_HORAS || 48), // 1 ponto/min cru
+      quinzeMinDias: Number(env.RETENCAO_METRICAS_15M_DIAS || 14), // médias de 15 min (min/max/média/p95)
+      horaDias: Number(env.RETENCAO_METRICAS_1H_DIAS || 90), // médias horárias
+      diaDias: Number(env.RETENCAO_METRICAS_1D_DIAS || 365), // médias diárias
+    },
     retencaoJobsDias: Number(env.RETENCAO_JOBS_DIAS || 90),
     limites: { global: 300, login: 10, registrar: 10, agente: 120 },
     tarefasPeriodicas: true,
