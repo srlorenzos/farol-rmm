@@ -164,8 +164,22 @@ class JanelaWebview:
         self.janela.events.closing += self._ao_fechar
 
     def _ao_fechar(self):
-        self.janela.hide()
+        # NÃO chama hide() aqui dentro do próprio handler do evento `closing`: o pywebview só decide se
+        # cancela o fechamento (Cancel=True no FormClosing do WinForms) DEPOIS que todos os handlers
+        # terminam de rodar, e esconder o formulário no meio dessa transição atrapalha essa decisão — a
+        # janela fecha de verdade mesmo com o handler retornando False. Como essa é a única janela, o
+        # pywebview encerra o laço de eventos inteiro quando ela fecha, e como todas as outras threads do
+        # processo são daemon, o PROCESSO INTEIRO morre (bug real, reproduzido mandando um WM_CLOSE de
+        # verdade pro HWND). Só pede o cancelamento aqui; o hide() roda um instante depois, já fora do
+        # evento (chamada entre threads que o pywebview já faz com segurança via Invoke do WinForms).
+        threading.Timer(0.05, self._esconder_depois_de_fechar).start()
         return False  # cancela o fechamento real: só esconde (o agente continua, a bandeja também)
+
+    def _esconder_depois_de_fechar(self) -> None:
+        try:
+            self.janela.hide()
+        except Exception:
+            log.exception("falha ao esconder a janela da bandeja depois do evento de fechamento")
 
     def iniciar_loop(self) -> None:
         """Bloqueia a thread atual (deve ser a thread principal do processo)."""
