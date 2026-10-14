@@ -14,6 +14,9 @@ Inspirado em ferramentas RMM como Tactical RMM e NinjaOne; código 100% original
 - **Multi-usuário.** Convide técnicos e leitores por link (sem senha provisória), três papéis fixos (administrador, técnico, somente leitura), redefinição de senha por link gerado pelo admin.
 - **Auditoria.** Logins (e falhas), tokens criados, agentes registrados/revogados, scripts executados, comandos digitados, mudanças de regras/exceções/janelas de manutenção e de chamados, com usuário, data, alvo e IP. Página com filtros.
 - **Segurança de verdade.** Senhas com scrypt, 2FA TOTP obrigatório para executar qualquer coisa (com QR Code gerado localmente, sem round-trip a nenhum serviço externo), reconfirmação por código a cada 10 min, bloqueio progressivo de login, CSRF, CSP restrita, tokens de uso único. Detalhes em [Segurança](#segurança).
+- **Terminal interativo remoto.** Sessão de shell de verdade (PowerShell/cmd no Windows, bash/sh em Linux/macOS) sobre o canal em tempo real, com eco local no painel e CTRL+C de verdade — diferente do console de comando único, essa sessão fica aberta e cada linha roda no mesmo processo. Auditada (início, fim, bytes trafegados), exige 2FA. Sem tela cheia (vim/htop não funcionam, documentado).
+- **Automação de verdade.** Agendamentos (intervalo em minutos ou expressão cron) rodam um script sozinhos num agente/site/cliente/todos/grupo, com histórico de disparos. Alertas podem disparar uma resposta automática (rodar um script) assim que abrem, com limite de repetição configurável. Políticas juntam exceções de alerta + agendamentos num pacote nomeado, aplicado de uma vez a um site, cliente ou grupo inteiro — mudar a política muda todas as máquinas nele.
+- **Grupos dinâmicos e campos personalizados.** Um grupo guarda só um filtro (sistema operacional, site/cliente, nome do dispositivo, tag, campo personalizado) e é recalculado a cada uso: um dispositivo novo que bate com o filtro entra sozinho, sem editar nada. Campos personalizados (UDFs) tipados — texto, número, sim/não, seleção — mais tags livres por dispositivo, usáveis como filtro de grupo.
 
 ## Como é o painel
 
@@ -161,9 +164,23 @@ No painel, **Chamados** no menu lateral mostra a lista com contador de abertos; 
 
 Em **Configurações → Usuários e papéis** (só administrador), convide alguém por `usuario` + `papel` (`tecnico` ou `leitura`) — o convite gera um link de uso único (válido por tempo limitado) para a pessoa definir a própria senha, sem senha provisória passando por e-mail ou chat. Para redefinir a senha de alguém que esqueceu, gere outro link do mesmo jeito; o anterior é invalidado. Um administrador sempre pode tudo; técnico executa scripts e comandos (com 2FA) mas não configura o sistema; leitura só visualiza.
 
-### Console / comando rápido
+### Console / comando rápido e terminal interativo
 
-A aba **Execuções** do detalhe do dispositivo tem uma caixa de comando rápido (PowerShell, CMD, Bash ou Python) com `Ctrl+Enter` para executar — pede confirmação 2FA como qualquer execução e fica na auditoria. Um terminal interativo de verdade (sessão contínua, não comando-a-comando) já tem o relay pronto no servidor e no agente, mas ainda não tem tela no painel — o botão "Terminal" no cabeçalho do dispositivo aparece como "em breve".
+A aba **Execuções** do detalhe do dispositivo tem uma caixa de comando rápido (PowerShell, CMD, Bash ou Python) com `Ctrl+Enter` para executar — pede confirmação 2FA como qualquer execução e fica na auditoria: manda, espera, recebe a saída, não é uma sessão contínua. O botão **Terminal** no cabeçalho do dispositivo (dispositivo online, exige 2FA) abre uma sessão de verdade: shell real (PowerShell/cmd no Windows, bash/sh em Linux/macOS) sobre o mesmo canal em tempo real do relay, com eco local no navegador e CTRL+C de verdade. Sem PTY — sem suporte a aplicativos de tela cheia (vim, htop, less) — e auditada (início, fim, bytes trafegados).
+
+### Automação: agendamentos, respostas automáticas e políticas
+
+**Automação → Agendamentos**: roda um script de tempos em tempos (minutos) ou numa expressão cron, num agente, site, cliente, todos os dispositivos ou um grupo dinâmico — mesma entrega ao agente da execução manual, com histórico de disparos (sucesso/erro, quantos jobs). Atalho "Agendar..." a partir de Meus scripts e da Biblioteca.
+
+**Configurações → Respostas automáticas**: cada tipo de alerta (CPU, memória, disco, offline) pode rodar um script sozinho assim que o alerta ABRE — não a cada atualização de um já aberto —, com um limite de repetição configurável pra não disparar toda vez que um alerta instável entra e sai. Fica auditado como automático e some durante janelas de manutenção, igual ao webhook.
+
+**Automação → Políticas**: um pacote nomeado de exceções de alerta (CPU/memória/disco/offline, mesmas 3 opções de "não incluir"/"desligado"/"personalizado" do ajuste por dispositivo) e moldes de agendamento, aplicado de uma vez a um alvo — agente, site, cliente, todos ou um grupo dinâmico. Reaplicar a mesma política no mesmo alvo atualiza os agendamentos já criados em vez de duplicar; excluir a política não desfaz o que ela já aplicou.
+
+### Grupos dinâmicos e campos personalizados
+
+**Gerenciar → Grupos**: um grupo guarda só um filtro — sistema operacional, site ou cliente, nome do dispositivo contém um texto, tem uma tag, ou um campo personalizado tem certo valor — e é recalculado a cada uso, nunca uma lista fixa de membros; o formulário mostra ao vivo quantos e quais dispositivos batem com o filtro, antes mesmo de salvar. Um grupo funciona como alvo em execução manual, agendamentos e políticas, igual a "site" ou "cliente".
+
+Campos personalizados (UDFs) são definidos em **Configurações → Campos personalizados** (texto, número, sim/não ou seleção) e editados por dispositivo na aba **Campos**, junto com tags livres — ambos viram dimensão de filtro de grupo.
 
 ### Janelas de manutenção e exceções de alerta
 
@@ -288,21 +305,22 @@ Testes locais: `cd site && npm install && npm run teste` (runner com `req`/`res`
 
 ## Roadmap
 
-- Terminal interativo no painel (relay já pronto no servidor/agente) e área de trabalho remota
 - Patches: listar e aplicar atualizações do Windows Update / `apt`/`dnf`
-- Jobs agendados recorrentes e políticas de automação/auto-resposta
-- Sites/grupos dinâmicos e descoberta automática de rede
+- Gerenciamento de software em lote (winget/apt/dnf) e ferramentas remotas que faltam (processos, serviços, arquivos, registro, visualizador de eventos)
+- Resposta automática a ransomware (monitor especializado de padrão de I/O + isolamento de rede — ciclo de design próprio, não entrou no lote de automação genérica)
+- Descoberta automática de rede e área de trabalho remota com controle
 - Notificações por e-mail e Teams/Discord nativas (hoje só webhook genérico)
 - Assinatura dos scripts e atualização automática do agente
+- Veja `ROADMAP-DATTO.md` para o roteiro completo de paridade com o Datto RMM, com o que já foi feito marcado.
 
 ## Limitações
 
-- Sem acesso remoto interativo de verdade: o "Terminal" no cabeçalho do dispositivo está "em breve" — o relay já existe no servidor e no agente (mesmo mecanismo usado pelo terminal de comando único e pelos chamados), falta só a tela no painel. O que existe hoje é o console de comando único (Execuções → comando rápido): manda, espera, recebe a saída — não é uma sessão contínua.
+- O terminal interativo não tem PTY de verdade — sem suporte a aplicativos de tela cheia (vim, htop, less); o painel faz eco local e manda linha por linha, funciona bem para o uso normal de console.
 - No Windows o agente tem instalador .exe sem Python; no Linux/macOS ainda é um script Python (3.10+ e `psutil`). Comandos PowerShell no Linux só funcionam se o `pwsh` estiver instalado — o agente detecta os interpretadores disponíveis e avisa antes de mandar um script incompatível, com uma mensagem explicando como instalar o que falta. Os exes não são assinados enquanto não houver certificado.
-- Jobs ficam na fila até o próximo check-in (até ~15 s de latência).
+- Jobs (manuais, agendados ou de política) ficam na fila até o próximo check-in do dispositivo (até ~15 s de latência, menos se o canal em tempo real estiver ativo).
 - SQLite atende bem algumas centenas de agentes, não milhares. O histórico de métricas é guardado em camadas (1 ponto/min por 48 h, depois agregado em 15 min/1 h/1 dia com retenção de 14/90/365 dias) justamente para isso — ver `ARQUITETURA.md`.
-- Sites/grupos e descoberta automática de rede ainda não existem (só clientes/sites manuais).
-- Sem patches do Windows Update / `apt`/`dnf`, sem políticas de automação/jobs agendados recorrentes, sem notificação por e-mail (webhook cobre Discord/Slack/ntfy).
+- Descoberta automática de rede ainda não existe (só clientes/sites/grupos manuais ou dinâmicos por filtro).
+- Sem patches do Windows Update / `apt`/`dnf` ainda, sem notificação por e-mail (webhook cobre Discord/Slack/ntfy), sem resposta automática a ransomware.
 - Convite de usuário e redefinição de senha são só por link gerado no painel (sem envio de e-mail automático — o administrador copia e manda o link).
 
 ## Licença

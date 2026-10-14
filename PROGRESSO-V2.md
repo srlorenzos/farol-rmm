@@ -9,10 +9,10 @@ Objetivo: RMM completo no nível do Datto RMM (funções + visual premium), iden
 ## Etapa 2 (depois da etapa 1, em paralelo, cada um num módulo)
 - [ ] Sites/grupos/filtros dinâmicos, descoberta de rede
 - [x] Instaladores Windows (empacotamento/): `farol-agente.exe` (PyInstaller; build em pasta para o serviço pywin32 "Farol RMM Agent", build de arquivo único com Tarefa Agendada como plano B), `FarolAgenteSetup.exe` (Inno Setup, `/VERYSILENT /SERVIDOR= /TOKEN=`), `farol-servidor.exe` (Node SEA, node:sqlite ok, assets embutidos), ícone multi-resolução, versão única em `empacotamento/VERSION`, `build.ps1`, workflow `release.yml` (tag `v*`, assinatura opcional) e comando silencioso na API de tokens/painel. Testado: exes contra servidor temporário (registro, check-in, `modulos`, `status`), SEA servindo painel/biblioteca/.pyz. NÃO testado por falta de administrador: criar serviço de verdade, UAC, rodar o Setup. `farol-bandeja.exe`: spec pronto, build pendente (o código-fonte já está pronto, ver item de 14/10 abaixo).
-- [ ] Ferramentas remotas: processos, serviços, arquivos, registro, eventos, **tela remota**. **Terminal interativo**:
-  o relay (sessão contínua painel⇄agente) já existe no núcleo e está testado (módulo `terminal`, exemplo `ping`/eco)
-  — falta só a tela no painel; hoje só existe o console de comando único (Execuções → comando rápido).
-- [ ] Automação: jobs agendados recorrentes, políticas de monitoramento, auto-resposta
+- [x] Terminal interativo (ver "Automação" abaixo). Resto das ferramentas remotas (processos, serviços, arquivos,
+  registro, eventos, **tela remota**) continua pendente — próximos itens do ROADMAP-DATTO.md depois de patches.
+- [x] Automação — ver seção própria abaixo (2026-10-14): jobs agendados, resposta automática a alerta, grupos
+  dinâmicos + UDFs, políticas. Pendente só a resposta a ransomware (ROADMAP-DATTO.md, item 1).
 - [ ] Patches (Windows Update, apt/dnf), software (winget), relatórios, dashboards
 - [x] Usuários/RBAC: módulo `usuarios` — convite por link (sem senha provisória), redefinição de senha por link do
   admin, papéis fixos (admin/técnico/leitura) já existentes desde a etapa 1. Testado (convite, duplicata,
@@ -68,6 +68,79 @@ ponta a ponta contra servidor/agente/bandeja **temporários** (nunca o servidor 
   componentes existentes (nenhum CSS novo em `painel/css/` — proibido pelas regras de módulo).
 - [x] Testes completos: 87 testes do servidor (`npm test`), 85 do agente (1 skip esperado no Windows), validador da
   biblioteca com 0 erros (551 scripts). README.md e este arquivo atualizados.
+
+## Etapa 2 — Automação (2026-10-14, continuação)
+Sessão seguinte, mesmo padrão (tudo contra servidor/agente temporários, nunca o :8420 real nem o agente real deste
+PC). Ordem: A) terminal interativo, B) automação — prioridade máxima explícita do usuário ("quero o melhor RMM do
+mundo, com automações").
+- [x] **A — Terminal interativo**: faltava o lado do agente inteiro (a reivindicação anterior de que já existia era
+  falsa — conferido, não existia). Módulo `agente/farol/modulos/terminal.py` novo: shell de verdade (PowerShell/cmd/
+  bash/sh conforme o SO) sobre a sessão de relay já existente, sem PTY (local-echo no painel, documentado como
+  limitação — sem suporte a apps de tela cheia tipo vim/htop). `painel/js/modulos/dispositivos/terminal.js` novo:
+  parser ANSI/SGR, aviso de gravação. Corrigido um bug real durante o teste: `cmd.exe` herdava a code page OEM da
+  máquina e saía com acento quebrado ("vers?o"); corrigido mandando `chcp 65001` automaticamente logo após abrir.
+  Testado ao vivo: comandos reais (`dir`, `whoami`, `echo`) com saída correta, CTRL+C encerrando o processo sem
+  matar o agente. 7 testes novos no agente, 2 no servidor (permissão/2FA).
+- [x] **B1 — Jobs agendados**: módulo `agendamentos` novo (intervalo em minutos ou cron de 5 campos,
+  `servidor/src/modulos/agendamentos/cron.js`, busca força-bruta minuto a minuto até 2 anos à frente). Nunca duplica
+  a entrega ao agente — o disparo (tarefa periódica a cada 20s) sempre chama a mesma `jobs.executar()` da execução
+  manual (extraída para `ctx.servicos.jobs.resolverScript()`/`.executar()`, reaproveitada também por B2/B4). Painel
+  em Automação → Agendamentos, atalho "Agendar..." em Meus scripts/Biblioteca. **Achado e corrigido durante o teste
+  visual**: `ui/camadas.js` → `gaveta()` fazia `painel.append(..., rodape ? h(...) : null)` — `Element.append(null)`
+  cria um nó de texto "null" visível; já afetava TODA gaveta sem rodapé em produção (inclusive "Executar script").
+  14 testes novos. **Testado ao vivo com relógio de parede real** (sem simular): agendamento "a cada 1 minuto"
+  disparou sozinho 60s depois — tarefa periódica real, `setInterval` real —, criou o job, o agente (fake, só HTTP)
+  buscou pelo check-in normal, reportou resultado, reagendou a próxima rodada.
+- [x] **B2 — Resposta automática a alerta**: cada tipo de regra (cpu/ram/disco/offline) ganha um script de resposta
+  opcional, disparado só na ABERTURA do alerta (não a cada atualização de um já aberto), com limite de repetição
+  configurável (anti-flapping) e suprimido durante manutenção — mesma regra do webhook. Fogo-e-esquece, sempre
+  auditado (sucesso ou falha), uma falha nunca derruba o alerta em si. Painel em Configurações → Respostas
+  automáticas (reaproveita o seletor de script de "Executar script"). 8 testes novos. **Testado ao vivo**: CPU alta
+  de verdade por 4 check-ins reais (regra padrão) abriu o alerta sozinho, a resposta configurada disparou sozinha
+  (nada forçado na mão), job real na fila do agente marcado `criado_por: "sistema (resposta a alerta)"`.
+- [x] **B3 — Grupos dinâmicos + campos personalizados (UDFs)**: módulo `grupos` novo. Um grupo guarda só um filtro
+  (SO, site/cliente, nome contém, tag, campo personalizado) — nunca uma lista de membros — e é resolvido de novo a
+  cada uso, registrado como um novo tipo de alvo (`ctx.alvos.registrar('grupo', ...)`, já previsto no comentário do
+  núcleo). UDFs tipados (texto/número/booleano/seleção) + tags livres, editáveis na nova aba "Campos" do
+  dispositivo. Painel em Gerenciar → Grupos, com prévia ao vivo no formulário (conta e lista quem bate com o filtro
+  antes mesmo de salvar). 9 testes novos. **Testado ao vivo o ponto central** (dinâmico de verdade): criado um grupo
+  "Windows" com 1 dispositivo, registrado um SEGUNDO dispositivo Windows depois — sem tocar no grupo — e ele passou
+  a aparecer sozinho, tanto na API quanto na prévia ao vivo do painel.
+- [x] **B4 — Políticas**: módulo `politicas` novo. Um pacote nomeado de exceções de alerta + moldes de agendamento,
+  aplicado de uma vez a um alvo (agente/site/cliente/todos/grupo) — nunca reinventa nada, só chama
+  `ctx.servicos.alertas.definirOverride()` e `ctx.servicos.agendamentos.criar()/atualizar()` (extraídos de
+  PUT /api/alertas/overrides e POST/PUT /api/agendamentos pra virarem serviços reaproveitáveis). Reaplicar no mesmo
+  alvo ATUALIZA os agendamentos já criados em vez de duplicar (`politicas_agendamentos` rastreia por
+  política+alvo+índice do molde). Painel em Automação → Políticas. **Achado e corrigido durante o teste visual**:
+  `lista.js` tinha um parêntese de fechamento faltando (faltava fechar o `preencher()` mais externo) — `SyntaxError`
+  que `node --check arquivo.js` não detecta (não força o modo módulo/estrito); só apareceu no navegador de verdade.
+  Revalidei TODOS os arquivos do painel desta sessão com `node --input-type=module --check`, que reproduz o parser
+  real — só esse tinha o problema. 7 testes novos. **Testado ao vivo**: política com exceção de CPU (75%/2 ciclos) +
+  agendamento aplicada em "todos os dispositivos" — overrides gravados de verdade nos 2 dispositivos (conferido via
+  GET /api/alertas/overrides), agendamento real disparando pelo agendador de verdade, reaplicar confirmado como
+  idempotente (atualiza, não duplica), aplicação num grupo dinâmico confirmado afetando só quem bate com o filtro.
+- [x] **Bug real de produção corrigido no meio do lote** (achado pelo usuário testando o instalador de verdade
+  nesta máquina): o instalador registrava o dispositivo no servidor (token consumido, config.json gravado) mas
+  NADA ficava rodando depois — nem serviço nem Tarefa Agendada —, e não existia log nenhum pra diagnosticar. Causas
+  reais: `logging.basicConfig()` nunca escrevia em arquivo (só console, invisível numa instalação via Setup/
+  `/VERYSILENT`); `_instalar_servico()`/`_instalar_tarefa()` só tratavam `ErroInstalacao`, uma exceção crua do
+  pywin32/SCM escapava sem virar mensagem legível; e não havia fallback de verdade entre serviço e Tarefa Agendada
+  — se o modo escolhido falhasse, a instalação só parava ali. Corrigido: `agente.log` sempre gravado (cai pra
+  `%TEMP%` se não der), `except Exception` final no `main()`, qualquer exceção do SCM/schtasks vira `ErroInstalacao`
+  com o motivo real, fallback automático serviço↔tarefa sem `--modo` explícito, e nunca mais um "sucesso" silencioso
+  — se os dois falharem, código de saída ≠ 0 com mensagem explicando os dois motivos e como rodar manualmente.
+  8 testes novos. **Testado com chamadas reais** (não só mockadas): com `eh_admin()` forçado `True` neste shell sem
+  privilégio de admin de verdade, o serviço falhou com "Acesso negado" de verdade (`OpenSCManager`), caiu pra Tarefa
+  Agendada, que também falhou de verdade (schtasks "Acesso negado") — log em arquivo, código de saída 5, nada
+  instalado no sistema. Build real via `build.ps1`: o exe sem admin pede elevação UAC de verdade (confirmado:
+  `consent.exe` real na tela, não deu pra fechar programaticamente sem admin — dispensado manualmente depois).
+  Não testado o caminho COM admin de verdade (ambiente sem como aprovar UAC interativamente) — limitação honesta.
+- [x] **QA visual consolidada de A + B1-B4**: todas as telas novas (Agendamentos, Respostas automáticas, Grupos,
+  aba Campos do dispositivo, Campos personalizados, Políticas) em 1440px e 500px, claro e escuro, Edge headless,
+  navegação completa por TODAS as rotas (novas + antigas) numa sessão só. Zero erro de console/página em qualquer
+  combinação depois dos dois bugs acima corrigidos.
+- [x] Testes completos: 125 testes do servidor (`npm test`, eram 87), 100 do agente (eram 85, 1 skip esperado no
+  Windows). ROADMAP-DATTO.md, README.md e este arquivo atualizados.
 
 ## Para retomar
 Ler este arquivo, ARQUITETURA.md e `git log`. Itens não marcados: relançar o agente correspondente.

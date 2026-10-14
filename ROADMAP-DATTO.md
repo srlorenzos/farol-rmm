@@ -9,33 +9,51 @@ e organiza em recursos concretos e implementáveis, não em frases de venda.
 Isto é um roteiro para as PRÓXIMAS etapas, depois que a Etapa 2 (ver PROGRESSO-V2.md)
 estiver sólida e testada. Não lançar agentes para isto ainda.
 
-## O que o Farol já tem (Etapa 1 + 2)
+## O que o Farol já tem (Etapa 1 + 2 + Automação)
 Monitoramento em tempo real, alertas por limiar com webhook, janelas de manutenção
 e overrides por agente, 551 scripts na biblioteca com variáveis tipadas, RBAC (3
-papéis), 2FA com QR, terminal remoto auditado, chamados/helpdesk com bandeja no
-Windows, licenciamento e site de vendas, instaladores .exe.
+papéis), 2FA com QR, terminal interativo remoto auditado, chamados/helpdesk com
+bandeja no Windows, licenciamento e site de vendas, instaladores .exe, downsampling
+de métricas em camadas. E agora (ver "Automação" abaixo): jobs agendados (cron/
+intervalo), resposta automática a alerta, grupos dinâmicos + campos personalizados
+(UDFs), e políticas (exceções de alerta + agendamentos aplicados de uma vez a um
+site/grupo).
 
 ## O que falta para paridade real com o Datto (por categoria, igual à pesquisa)
 
 ### 1. Automação — PRIORIDADE MÁXIMA (o usuário pediu explicitamente)
 Hoje o Farol só executa script sob pedido manual. O Datto tem automação de verdade:
-- **Monitores viram gatilhos de automação**: quando um monitor entra em alerta, disparar
-  automaticamente um script de resposta (ex. disco cheio → roda limpeza; serviço
-  parado → reinicia o serviço), não só notificar. "Resposta automática" com registro
-  de que foi automático na auditoria.
-- **Jobs agendados** (cron por agente/site/grupo): rodar um script toda terça às 22h,
-  todo dia às 3h, etc. Reaproveitar o `ctx.agendador` do núcleo.
-- **Políticas**: um conjunto de regras (quais monitores, quais limiares, quais scripts
-  de resposta, qual agenda de patch) aplicado a um SITE ou GRUPO inteiro, não por
-  máquina. Mudar a política do grupo muda todas as máquinas nele.
-- **Grupos dinâmicos por filtro**: um grupo cuja lista de membros é calculada por uma
-  condição (SO = Windows Server, site = X, tag = "financeiro"), e quando uma máquina
-  nova bate com o filtro, herda a política automaticamente — sem ação manual.
-- **UDFs (campos customizados tipados)** por dispositivo, usáveis nos filtros de grupo.
-- **Resposta a ransomware**: um monitor especializado (padrão de I/O de disco anômalo
-  + extensões suspeitas) que isola a máquina da rede (desliga a placa de rede via
-  comando do agente) e tenta encerrar o processo, com confirmação/auditoria forte
-  (isto é uma ação destrutiva — exige 2FA e fica bem documentado).
+- ✅ **Feito** — **Monitores viram gatilhos de automação**: quando um alerta (CPU/RAM/
+  disco/offline) abre pela primeira vez, dispara automaticamente um script de resposta
+  configurado por tipo, com limite de repetição (anti-flapping), auditado como
+  automático (`alerta_resposta_disparada`/`alerta_resposta_falhou`). Configuração em
+  Configurações → Respostas automáticas (`servidor/src/modulos/alertas/index.js`,
+  `dispararRespostaAutomatica`).
+- ✅ **Feito** — **Jobs agendados** (cron de 5 campos ou intervalo em minutos, por
+  agente/site/cliente/todos/grupo): módulo `agendamentos`, reaproveita `ctx.agendador`
+  e a mesma entrega de `jobs.executar()` da execução manual. Painel em Automação →
+  Agendamentos, com atalho "Agendar..." a partir de Scripts/Biblioteca.
+- ✅ **Feito** — **Políticas**: um pacote nomeado de exceções de alerta (overrides por
+  tipo) + moldes de agendamento, aplicado de uma vez a um alvo (agente/site/cliente/
+  todos/grupo). Reaplicar no mesmo alvo atualiza em vez de duplicar os agendamentos.
+  Módulo `politicas`, nunca reinventa `alertas`/`agendamentos` — só chama os serviços
+  deles. Painel em Automação → Políticas.
+- ✅ **Feito** — **Grupos dinâmicos por filtro**: um grupo guarda só um filtro (SO,
+  site/cliente, nome contém, tag, campo personalizado) e é resolvido de novo a cada
+  uso — um dispositivo novo que bate com o filtro aparece sozinho, sem editar nada.
+  Registrado como um novo tipo de alvo (`ctx.alvos.registrar('grupo', ...)`), então já
+  funciona em execução manual, agendamentos e políticas sem nenhum código extra.
+  Módulo `grupos`, painel em Gerenciar → Grupos (com prévia ao vivo no formulário).
+- ✅ **Feito** — **UDFs (campos customizados tipados)** por dispositivo (texto/número/
+  booleano/seleção) + tags livres, editáveis na aba "Campos" do dispositivo, usáveis
+  como dimensão de filtro de grupo dinâmico. Mesmo módulo `grupos`.
+- ⬜ **Não feito** — **Resposta a ransomware**: um monitor especializado (padrão de I/O
+  de disco anômalo + extensões suspeitas) que isola a máquina da rede (desliga a placa
+  de rede via comando do agente) e tenta encerrar o processo, com confirmação/auditoria
+  forte (ação destrutiva — exige 2FA e fica bem documentada). Deixado de fora de
+  propósito: é um monitor/resposta especializados de verdade (detecção de padrão, não
+  só limiar), merece o próprio ciclo de design + teste, não cabia no mesmo lote das
+  automações "genéricas" acima.
 
 ### 2. Patch management
 - Windows Update: listar patches pendentes, aprovar/recusar por política, agendar
@@ -106,8 +124,10 @@ Hoje o Farol só executa script sob pedido manual. O Datto tem automação de ve
 - App móvel nativo — o painel já é responsivo; um app dedicado é projeto à parte.
 
 ## Ordem sugerida das próximas etapas
-1. **Automação** (item 1) — é o pedido explícito do usuário, maior valor.
-2. Patch management (item 2) + software em lote (item 3).
+1. ✅ **Automação** (item 1) — pedido explícito do usuário, maior valor. Feito: jobs
+   agendados, resposta automática a alerta, grupos dinâmicos + UDFs, políticas.
+   Pendente só a resposta a ransomware (monitor especializado, ciclo próprio).
+2. **Patch management (item 2) + software em lote (item 3) — próximo item.**
 3. Ferramentas remotas que faltam, exceto tela remota (item 4, sem o controle de tela).
 4. Descoberta de rede (item 5).
 5. Relatórios agendados (item 7).
