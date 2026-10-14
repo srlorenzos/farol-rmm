@@ -142,7 +142,39 @@ mundo, com automações").
 - [x] Testes completos: 125 testes do servidor (`npm test`, eram 87), 100 do agente (eram 85, 1 skip esperado no
   Windows). ROADMAP-DATTO.md, README.md e este arquivo atualizados.
 
+## Etapa 2 — Bandeja (crash real) + Tela remota (2026-10-14, continuação)
+Sessão seguinte: dois bugs reais de produção encontrados pelo usuário testando nesta máquina, corrigidos com
+prioridade máxima; depois a funcionalidade mais aguardada pelo usuário, tela remota, construída do zero.
+- [x] **Bug real de produção corrigido primeiro**: ícone da bandeja sumia e o processo morria ao fechar a janela
+  pelo X (não pelo "Sair" do menu) — confirmado pelo usuário ao vivo ("consegui abrir, agora sumiu de novo"; nenhum
+  `farol_bandeja.py` rodando depois). Causa real: `JanelaWebview._ao_fechar()` chamava `self.janela.hide()`
+  SINCRONAMENTE dentro do handler `closing` do pywebview — o `Event.set()` do pywebview roda os handlers de forma
+  síncrona e só decide cancelar o fechamento DEPOIS que todos terminam; chamar `hide()` ali no meio corrompe essa
+  decisão e a janela fecha de verdade apesar do handler devolver `False`. Corrigido adiando o `hide()` por 50ms via
+  `threading.Timer`, fora do handler. 3 testes novos (`test_bandeja_janela.py`). **Testado ao vivo o fluxo exato
+  pedido**: ícone aparece → clique abre a janela → fechar pelo X (WM_CLOSE real na HWND real) → ícone CONTINUA lá e
+  o processo CONTINUA vivo, confirmado antes/depois por PID exato (sem matar processo nenhum do usuário — só o de
+  teste, por PID rastreado).
+- [x] **Tela remota** — construída em ordem (cada etapa testada e commitada antes da próxima), reaproveitando a
+  infraestrutura de relay do terminal: 1) captura de tela (`mss`) → relay (só visualização); 2) canvas no painel com
+  fps/qualidade configuráveis; 3) controle de mouse/teclado injetado via `ctypes`/`user32.dll`; 4) segurança (2FA/
+  elevação, auditoria, aviso à pessoa na frente da máquina via bandeja, limitação documentada em sistemas não-
+  Windows); 5) limite de 1 sessão simultânea por dispositivo. Duas primitivas novas e genéricas no núcleo do relay
+  (`servidor/src/nucleo/relay.js`): `maxPorAgente` (limite de sessões simultâneas por tipo+agente) e `aoAbrir`
+  (callback disparado quando uma sessão abre — usado aqui pra mandar `tela.notificar` à bandeja, best-effort).
+  Módulos novos: `servidor/src/modulos/tela/index.js`, `agente/farol/modulos/tela.py`,
+  `painel/js/modulos/dispositivos/tela-remota.js`. 4 testes novos no servidor, 10 no agente (captura e injeção de
+  cursor reais nesta máquina, não mock). **Testado de ponta a ponta com agente REAL** (processo python de verdade,
+  não um stand-in HTTP): servidor e agente temporários, painel real no Edge headless clicando em "Tela remota",
+  quadro JPEG de verdade desenhando no canvas (screenshot confirmado), e um `mousemove` disparado pelo painel
+  movendo o cursor real desta máquina ~125px (confirmado via `GetCursorPos`/`Cursor.Position`) — prova a cadeia
+  completa navegador → WebSocket → relay → agente → `user32.dll` → cursor do SO. Zero erros de console. Controle de
+  teclado foi construído e testado só por unidade (guarda de código inválido); o pipeline de controle é o mesmo do
+  mouse, já provado ao vivo.
+- [x] Testes completos: 129 testes do servidor (eram 125), 114 do agente (eram 100, 1 skip esperado no Windows).
+  ROADMAP-DATTO.md, README.md e este arquivo atualizados.
+
 ## Para retomar
 Ler este arquivo, ARQUITETURA.md e `git log`. Itens não marcados: relançar o agente correspondente.
 Não publicar: push e deploy só depois de revisar. Netlify está em ~75% dos créditos do mês — evitar deploys; considerar mover a vitrine para GitHub Pages.
-Próximo item óbvio: tela de terminal interativo no painel (o relay de backend já está pronto e testado).
+Próximo item óbvio (ROADMAP-DATTO.md): patch management (item 2) + software em lote (item 3).

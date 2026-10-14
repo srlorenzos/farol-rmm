@@ -12,12 +12,12 @@ estiver sólida e testada. Não lançar agentes para isto ainda.
 ## O que o Farol já tem (Etapa 1 + 2 + Automação)
 Monitoramento em tempo real, alertas por limiar com webhook, janelas de manutenção
 e overrides por agente, 551 scripts na biblioteca com variáveis tipadas, RBAC (3
-papéis), 2FA com QR, terminal interativo remoto auditado, chamados/helpdesk com
-bandeja no Windows, licenciamento e site de vendas, instaladores .exe, downsampling
-de métricas em camadas. E agora (ver "Automação" abaixo): jobs agendados (cron/
-intervalo), resposta automática a alerta, grupos dinâmicos + campos personalizados
-(UDFs), e políticas (exceções de alerta + agendamentos aplicados de uma vez a um
-site/grupo).
+papéis), 2FA com QR, terminal interativo remoto auditado, tela remota com controle de
+mouse/teclado, chamados/helpdesk com bandeja no Windows, licenciamento e site de
+vendas, instaladores .exe, downsampling de métricas em camadas. E agora (ver
+"Automação" abaixo): jobs agendados (cron/intervalo), resposta automática a alerta,
+grupos dinâmicos + campos personalizados (UDFs), e políticas (exceções de alerta +
+agendamentos aplicados de uma vez a um site/grupo).
 
 ## O que falta para paridade real com o Datto (por categoria, igual à pesquisa)
 
@@ -68,16 +68,22 @@ Hoje o Farol só executa script sob pedido manual. O Datto tem automação de ve
 - "Advanced software management" do Datto é basicamente isso + lista maior de apps
   reconhecidos — não precisa replicar uma lista proprietária, só cobrir os apps comuns.
 
-### 4. Ferramentas remotas (parte já existe: terminal)
+### 4. Ferramentas remotas (parte já existe: terminal + tela remota)
 - Processos: listar e matar processo remoto.
 - Serviços: listar, iniciar/parar/reiniciar, mudar tipo de inicialização.
 - Arquivos: navegador de arquivos remoto básico (listar, baixar, enviar) — cuidado
   redobrado de segurança aqui (é a superfície mais perigosa).
 - Registro do Windows: ler/editar chaves (também sensível, exigir 2FA/confirmação).
 - Visualizador de eventos remoto (Application/System/Security, os últimos N).
-- **Tela remota com controle** (o item que falta do "acesso remoto com um clique" do
-  Datto): WebRTC ou um protocolo próprio sobre o relay já existente; maior esforço
-  de todo o roteiro, avaliar depois de automação/patch estarem prontos.
+- ✅ **Feito** — **Tela remota com controle** (o "acesso remoto com um clique" do
+  Datto): protocolo próprio (JPEG via `mss`) sobre o relay já existente do terminal,
+  não WebRTC — mais simples e reaproveita toda a infraestrutura de sessão/auditoria/
+  2FA. Controle de mouse/teclado via `ctypes`/`user32.dll`, só Windows por ora (Linux/
+  macOS mostram só a tela, documentado na UI). Aviso à pessoa na frente da máquina via
+  bandeja, 1 sessão por dispositivo (`maxPorAgente` no núcleo do relay), auditada.
+  Módulos `servidor/src/modulos/tela` e `agente/farol/modulos/tela.py`, painel em
+  `painel/js/modulos/dispositivos/tela-remota.js`. Testado com agente real (captura e
+  controle de verdade, não mock).
 
 ### 5. Descoberta de rede e inventário
 - Varredura de rede local a partir de um agente (ARP/ping sweep + fingerprint básico)
@@ -127,11 +133,13 @@ Hoje o Farol só executa script sob pedido manual. O Datto tem automação de ve
 1. ✅ **Automação** (item 1) — pedido explícito do usuário, maior valor. Feito: jobs
    agendados, resposta automática a alerta, grupos dinâmicos + UDFs, políticas.
    Pendente só a resposta a ransomware (monitor especializado, ciclo próprio).
-2. **Patch management (item 2) + software em lote (item 3) — próximo item.**
-3. Ferramentas remotas que faltam, exceto tela remota (item 4, sem o controle de tela).
-4. Descoberta de rede (item 5).
-5. Relatórios agendados (item 7).
-6. Tela remota com controle (item 4, parte pesada) — maior esforço de engenharia.
+2. ✅ **Tela remota com controle** (item 4, parte pesada) — feito antes do previsto,
+   prioridade explícita do usuário (era a funcionalidade mais aguardada).
+3. **Patch management (item 2) + software em lote (item 3) — próximo item.**
+4. Ferramentas remotas que faltam (processos, serviços, arquivos, registro, eventos —
+   resto do item 4).
+5. Descoberta de rede (item 5).
+6. Relatórios agendados (item 7).
 7. IA/insights (item 8), API com chaves escopadas (item 9).
 8. M365/Intune (item 6) e conformidade expandida (item 11) — conforme demanda real.
 
