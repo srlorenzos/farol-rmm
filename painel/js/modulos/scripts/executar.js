@@ -131,3 +131,18 @@ export function executarScript(o = {}) {
 export async function comandoRapido(agente, comando, shell) {
   return comElevacao(`Executar um comando em ${agente.hostname}.`, () => post('/api/executar', { agentes: [agente.id], comando, shell, timeout: 120 }));
 }
+
+/**
+ * Atalho "Agendar…" a partir de Meus scripts / Biblioteca. Import dinâmico (em vez de um import estático
+ * no topo do arquivo) para não acoplar o módulo scripts ao módulo agendamentos: cada módulo do painel
+ * continua podendo falhar/faltar de forma independente (mesma regra que os torna descobertos em runtime).
+ * @param {{ script?: object, biblioteca?: object }} o
+ */
+export async function agendarScript(o) {
+  try {
+    const { abrirAgendamentoModal } = await import('../agendamentos/modal.js');
+    await abrirAgendamentoModal(o);
+  } catch (e) {
+    toastErro(e);
+  }
+}

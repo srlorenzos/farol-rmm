@@ -107,8 +107,9 @@ export function gaveta({ titulo, descricao, conteudo, rodape, larga = false }) {
     h('header', { class: 'gaveta-cabecalho' },
       h('div', { class: 'cresce' }, h('h2', { id: idTitulo, text: titulo }), descricao ? h('p', { text: descricao }) : null),
       h('button', { class: 'btn-icone', 'aria-label': 'Fechar', onclick: () => camada.fechar(null) }, icone('fechar'))),
-    h('div', { class: 'gaveta-corpo' }, conteudo(camada.fechar)),
-    rodape ? h('footer', { class: 'gaveta-rodape' }, rodape(camada.fechar)) : null);
+    h('div', { class: 'gaveta-corpo' }, conteudo(camada.fechar)));
+  // Element.append(null) vira um nó de texto "null" (String(null)) — só anexa o rodapé quando ele existe.
+  if (rodape) painel.append(h('footer', { class: 'gaveta-rodape' }, rodape(camada.fechar)));
   fundo.addEventListener('mousedown', () => camada.fechar(null));
   return camada;
 }

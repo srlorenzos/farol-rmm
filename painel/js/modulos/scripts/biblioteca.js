@@ -7,7 +7,7 @@ import { pode } from '../../nucleo/estado.js';
 import { fmtInt, NOMES_SHELL } from '../../nucleo/formato.js';
 import { cabecalhoPagina, botao, busca, chipsFiltro, vazio, skeleton, selo, blocoMono, listaDef, aviso } from '../../ui/componentes.js';
 import { gaveta, toast, toastErro } from '../../ui/camadas.js';
-import { executarScript, selosScript } from './executar.js';
+import { executarScript, agendarScript, selosScript } from './executar.js';
 
 const TIPOS = { acao: 'Ação', monitor: 'Monitor', auditoria: 'Auditoria' };
 
@@ -78,6 +78,7 @@ export async function abrirDetalhe(id) {
         if (s.importado_id) { fechar(); location.hash = `#/scripts/${s.importado_id}`; return; }
         try { const r = await post(`/api/biblioteca/${s.id}/importar`); toast('Script importado para Meus scripts.', 'sucesso'); fechar(); location.hash = `#/scripts/${r.id}`; } catch (e) { toastErro(e); }
       } }) : null,
+      pode('agendamentos.gerenciar') ? botao('Agendar…', { icone: 'relogio', onclick: () => { fechar(); agendarScript({ biblioteca: s }); } }) : null,
       pode('scripts.executar') ? botao('Executar…', { variante: 'primario', icone: 'play', onclick: () => { fechar(); executarScript({ biblioteca: s }); } }) : null,
     ].filter(Boolean),
   });

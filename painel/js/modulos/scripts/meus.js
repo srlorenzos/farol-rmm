@@ -6,7 +6,7 @@ import { pode } from '../../nucleo/estado.js';
 import { NOMES_SHELL, relativo, normalizar } from '../../nucleo/formato.js';
 import { cabecalhoPagina, botao, busca, campo, input, select, textarea, vazio, skeleton, selo, check, comCarregando } from '../../ui/componentes.js';
 import { confirmar, toast, toastErro } from '../../ui/camadas.js';
-import { executarScript, selosScript } from './executar.js';
+import { executarScript, agendarScript, selosScript } from './executar.js';
 
 export function paginaMeus(raiz, { params }) {
   let scripts = [];
@@ -89,7 +89,8 @@ export function paginaMeus(raiz, { params }) {
       variaveis),
     leitura ? null : h('div', { class: 'linha-entre' },
       h('div', { class: 'grupo-botoes' }, salvar,
-        atual !== 'novo' && pode('scripts.executar') ? botao('Executar…', { icone: 'play', onclick: () => executarScript({ script: s }) }) : null),
+        atual !== 'novo' && pode('scripts.executar') ? botao('Executar…', { icone: 'play', onclick: () => executarScript({ script: s }) }) : null,
+        atual !== 'novo' && pode('agendamentos.gerenciar') ? botao('Agendar…', { icone: 'relogio', onclick: () => agendarScript({ script: s }) }) : null),
       atual !== 'novo' ? botao('Excluir', { variante: 'perigo-sutil', icone: 'lixo', onclick: excluir }) : null));
     area.setAttribute('aria-labelledby', 'rot-codigo');
 
