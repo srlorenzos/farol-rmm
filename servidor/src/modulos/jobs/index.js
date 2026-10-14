@@ -3,7 +3,7 @@
 // "acordado" na hora para buscar o job. Variáveis viram FAROL_<NOME> no ambiente do processo.
 import { randomUUID } from 'node:crypto';
 import { transacao } from '../../db.js';
-import { PARAMS_ID, PARAMS_AGENTE, ID_AGENTE, ALVO_SCHEMA, MAX_SAIDA, truncar, filtroEscopo, ESCOPO_QUERY } from '../../nucleo/util.js';
+import { PARAMS_ID, PARAMS_AGENTE, ID_AGENTE, ALVO_SCHEMA, MAX_SAIDA, erroHttp, truncar, filtroEscopo, ESCOPO_QUERY } from '../../nucleo/util.js';
 import { montarAmbiente, ambienteParaAuditoria } from '../../nucleo/variaveis.js';
 import { SHELLS } from '../scripts/index.js';
 
@@ -29,6 +29,48 @@ export function lerStatusMonitor(stdout) {
   return null;
 }
 
+/**
+ * Cria jobs pra um alvo a partir de um script já resolvido — mesma lógica usada por POST /api/executar,
+ * reaproveitada por quem dispara execução programaticamente (agendamentos, resposta automática a alerta):
+ * nunca duplicar a entrega ao agente, é sempre esta função que grava em `jobs` e acorda o canal.
+ * @param {{ script, variaveisExtra?, timeoutOverride?, alvo?, agentes?, criadoPor? }} opcoes
+ * @returns {{ lote, jobs: [{id, agente_id, hostname}], ignorados, alvos, env }}
+ * @throws erro com .statusCode (400) quando o alvo/script não resulta em nenhum dispositivo válido.
+ */
+export async function criarExecucao(ctx, { script, variaveisExtra = {}, timeoutOverride, alvo, agentes, criadoPor = 'sistema' }) {
+  const { db } = ctx;
+  const env = montarAmbiente(script.variaveis, variaveisExtra);
+  const timeout = timeoutOverride ?? script.timeout ?? 60;
+
+  if (!alvo && !agentes) throw erroHttp(400, 'Informe o alvo (alvo ou agentes)');
+  const resolvidos = await ctx.alvos.resolver(alvo ?? { tipo: 'agente', id: agentes });
+  if (agentes && resolvidos.length !== agentes.length) throw erroHttp(400, 'Agente inexistente ou revogado na seleção');
+  if (!resolvidos.length) throw erroHttp(400, 'Nenhum dispositivo no alvo');
+  const ignorados = [];
+  const alvosResolvidos = resolvidos.filter((a) => {
+    const so = soDoAgente(a.so);
+    if (script.so && so && !script.so.includes(so)) { ignorados.push({ id: a.id, hostname: a.hostname, motivo: `script não é para ${so}` }); return false; }
+    return true;
+  });
+  if (!alvosResolvidos.length) throw erroHttp(400, 'O script não é compatível com o sistema dos dispositivos do alvo', { ignorados });
+
+  const agora = Date.now();
+  const lote = randomUUID();
+  const envJson = Object.keys(env).length ? JSON.stringify(env) : null;
+  const ins = db.prepare(`INSERT INTO jobs (agente_id, script_id, nome, shell, conteudo, timeout, status, criado_por, criado_em, lote, origem, env_json, tipo)
+    VALUES (?, ?, ?, ?, ?, ?, 'pendente', ?, ?, ?, ?, ?, ?)`);
+  const jobs = transacao(db, () => alvosResolvidos.map((a) => {
+    const r = ins.run(a.id, script.id && script.origem?.startsWith('script:') ? script.id : null, script.nome, script.shell, script.conteudo,
+      timeout, criadoPor, agora, lote, script.origem, envJson, script.tipo ?? 'acao');
+    return { id: Number(r.lastInsertRowid), agente_id: a.id, hostname: a.hostname };
+  }));
+  for (const j of jobs) {
+    ctx.emitir('job', { ...j, nome: script.nome, status: 'pendente', criado_em: agora, criado_por: criadoPor, lote });
+    ctx.canalAgentes.acordar(j.agente_id);
+  }
+  return { lote, jobs, ignorados, alvos: alvosResolvidos, env };
+}
+
 export default {
   nome: 'jobs',
   descricao: 'Execução de scripts e comandos nos dispositivos',
@@ -36,6 +78,13 @@ export default {
   permissoes: {
     'scripts.executar': { descricao: 'Executar scripts e comandos nos dispositivos (exige 2FA)', papeis: ['tecnico'] },
     'jobs.ver': { descricao: 'Ver execuções e suas saídas', papeis: ['tecnico', 'leitura'] },
+  },
+
+  servico(ctx) {
+    return {
+      /** Ver criarExecucao() acima — é isto que agendamentos/alertas (resposta automática) devem chamar. */
+      executar: (opcoes) => criarExecucao(ctx, opcoes),
+    };
   },
   migracoes: [
     // 1 — tabela da v1
@@ -137,30 +186,16 @@ export default {
       } else {
         return reply.code(400).send({ erro: 'Informe script_id, biblioteca_id ou comando + shell' });
       }
-      const env = montarAmbiente(script.variaveis, b.variaveis ?? {});
-      const timeout = b.timeout ?? script.timeout ?? 60;
-
-      if (!b.alvo && !b.agentes) return reply.code(400).send({ erro: 'Informe o alvo (alvo ou agentes)' });
-      const resolvidos = await ctx.alvos.resolver(b.alvo ?? { tipo: 'agente', id: b.agentes });
-      if (b.agentes && resolvidos.length !== b.agentes.length) return reply.code(400).send({ erro: 'Agente inexistente ou revogado na seleção' });
-      if (!resolvidos.length) return reply.code(400).send({ erro: 'Nenhum dispositivo no alvo' });
-      const ignorados = [];
-      const alvos = resolvidos.filter((a) => {
-        const so = soDoAgente(a.so);
-        if (script.so && so && !script.so.includes(so)) { ignorados.push({ id: a.id, hostname: a.hostname, motivo: `script não é para ${so}` }); return false; }
-        return true;
-      });
-      if (!alvos.length) return reply.code(400).send({ erro: 'O script não é compatível com o sistema dos dispositivos do alvo', ignorados });
-
-      const agora = Date.now();
-      const lote = randomUUID();
-      const envJson = Object.keys(env).length ? JSON.stringify(env) : null;
-      const ins = db.prepare(`INSERT INTO jobs (agente_id, script_id, nome, shell, conteudo, timeout, status, criado_por, criado_em, lote, origem, env_json, tipo)
-        VALUES (?, ?, ?, ?, ?, ?, 'pendente', ?, ?, ?, ?, ?, ?)`);
-      const jobs = transacao(db, () => alvos.map((a) => {
-        const r = ins.run(a.id, b.script_id ?? null, script.nome, script.shell, script.conteudo, timeout, req.sessao.usuario, agora, lote, script.origem, envJson, script.tipo ?? 'acao');
-        return { id: Number(r.lastInsertRowid), agente_id: a.id, hostname: a.hostname };
-      }));
+      let resultado;
+      try {
+        resultado = await criarExecucao(ctx, {
+          script, variaveisExtra: b.variaveis ?? {}, timeoutOverride: b.timeout, alvo: b.alvo, agentes: b.agentes, criadoPor: req.sessao.usuario,
+        });
+      } catch (e) {
+        if (e.statusCode) return reply.code(e.statusCode).send({ erro: e.message, ...(e.extra ?? {}) });
+        throw e;
+      }
+      const { lote, jobs, ignorados, alvos, env } = resultado;
       ctx.auditarReq(req, b.comando ? 'comando_executado' : 'script_executado', {
         alvo: alvos.length > 20 ? `${alvos.length} dispositivos` : alvos.map((a) => a.hostname).join(', '),
         agente_id: alvos.length === 1 ? alvos[0].id : null,
@@ -168,10 +203,6 @@ export default {
           ...(Object.keys(env).length ? { variaveis: ambienteParaAuditoria(script.variaveis, env) } : {}),
           ...(b.comando ? { comando: script.conteudo.slice(0, 500) } : {}) },
       });
-      for (const j of jobs) {
-        ctx.emitir('job', { ...j, nome: script.nome, status: 'pendente', criado_em: agora, criado_por: req.sessao.usuario, lote });
-        ctx.canalAgentes.acordar(j.agente_id);
-      }
       return { lote, jobs, ignorados };
     });
 
