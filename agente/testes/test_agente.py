@@ -7,6 +7,7 @@ import tempfile
 import time
 import unittest
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -146,6 +147,68 @@ class TestExecucao(unittest.TestCase):
     @unittest.skipIf(fa.WINDOWS, "somente Linux/macOS")
     def test_bash(self):
         self.assertEqual(fa.executar_job(self.job("echo ola", shell="bash"))["stdout"].strip(), "ola")
+
+
+class TestInterpretadores(unittest.TestCase):
+    """Detecção de interpretadores disponíveis e falha rápida com mensagem acionável quando falta um."""
+
+    def test_capacidades_reportadas_no_checkin(self):
+        p = fa.montar_checkin("https://farol.exemplo.com", com_inventario=False, intervalo_cpu=0.1)
+        caps = p["info"]["capacidades"]
+        self.assertTrue(any(c.startswith("interpretador:") for c in caps), caps)
+        if fa.WINDOWS:
+            self.assertIn("interpretador:cmd", caps)
+            self.assertIn("interpretador:powershell", caps)
+        self.assertIn("interpretador:python3", caps)
+
+    def test_interpretadores_disponiveis_windows(self):
+        with mock.patch.object(execucao, "WINDOWS", True), \
+             mock.patch.object(execucao.shutil, "which", side_effect=lambda n: f"/usr/bin/{n}" if n in ("bash", "sh") else None):
+            nomes = execucao.interpretadores_disponiveis()
+        self.assertIn("interpretador:cmd", nomes)
+        self.assertIn("interpretador:powershell", nomes)
+        self.assertIn("interpretador:bash", nomes)
+        self.assertIn("interpretador:sh", nomes)
+        self.assertIn("interpretador:python3", nomes)
+
+    def test_interpretadores_disponiveis_linux_sem_pwsh_nem_bash(self):
+        with mock.patch.object(execucao, "WINDOWS", False), \
+             mock.patch.object(execucao.shutil, "which", return_value=None):
+            nomes = execucao.interpretadores_disponiveis()
+        self.assertNotIn("interpretador:cmd", nomes)
+        self.assertNotIn("interpretador:powershell", nomes)
+        self.assertNotIn("interpretador:bash", nomes)
+        self.assertIn("interpretador:python3", nomes, "python3 sempre disponível: é o próprio interpretador do agente")
+
+    def test_mensagem_powershell_ausente_sugere_instalacao(self):
+        msg = execucao._interpretador_ausente("powershell")
+        self.assertIn("pwsh", msg)
+        self.assertIn("instale", msg.lower())
+
+    def test_mensagem_cmd_ausente_explica_so(self):
+        self.assertIn("Windows", execucao._interpretador_ausente("cmd"))
+
+    def test_mensagem_bash_ausente_sugere_alternativa(self):
+        msg = execucao._interpretador_ausente("bash")
+        self.assertTrue("Git for Windows" in msg or "apt" in msg or "distro" in msg)
+
+    def test_preparar_falha_rapido_sem_gravar_arquivo_quando_interpretador_ausente(self):
+        with tempfile.TemporaryDirectory() as pasta:
+            with mock.patch.object(execucao, "WINDOWS", False), \
+                 mock.patch.object(execucao.shutil, "which", return_value=None):
+                with self.assertRaises(FileNotFoundError) as ctx:
+                    execucao._preparar("bash", "echo oi", pasta)
+            self.assertIn("bash", str(ctx.exception))
+            self.assertEqual(os.listdir(pasta), [], "não deve gravar o script se o interpretador nem existe")
+
+    def test_job_com_interpretador_ausente_devolve_erro_acionavel_sem_travar(self):
+        job = {"id": 1, "shell": "bash", "conteudo": "echo oi", "timeout": 30}
+        with mock.patch.object(execucao, "WINDOWS", False), \
+             mock.patch.object(execucao.shutil, "which", return_value=None):
+            r = fa.executar_job(job)
+        self.assertIsNone(r["codigo_saida"])
+        self.assertFalse(r["timeout"])
+        self.assertIn("bash", r["erro"])
 
 
 class TestConfig(unittest.TestCase):

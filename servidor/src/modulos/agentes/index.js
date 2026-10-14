@@ -59,7 +59,13 @@ const inventarioSchema = {
 // Colunas da lista de dispositivos (o detalhe acrescenta discos, inventário etc.).
 const COLUNAS = `a.id, a.hostname, a.descricao, a.so, a.so_versao, a.arquitetura, a.versao_agente, a.ip_local, a.usuario_logado,
   a.cpu_pct, a.ram_usada, a.ram_total, a.disco_max_pct, a.uptime, a.status, a.ultimo_checkin, a.registrado_em,
-  a.site_id, s.nome AS site_nome, s.cliente_id, c.nome AS cliente_nome`;
+  a.site_id, s.nome AS site_nome, s.cliente_id, c.nome AS cliente_nome, a.capacidades_json`;
+
+/** Troca `capacidades_json` (coluna crua) por `capacidades` (array) numa linha — usado nas duas rotas de listagem. */
+function comCapacidades(linha) {
+  const { capacidades_json, ...resto } = linha;
+  return { ...resto, capacidades: capacidades_json ? JSON.parse(capacidades_json) : [] };
+}
 const FROM = 'FROM agentes a JOIN sites s ON s.id = a.site_id JOIN clientes c ON c.id = s.cliente_id';
 
 function ehLocal(url) {
@@ -259,23 +265,22 @@ export default {
       schema: { querystring: { type: 'object', properties: { ...ESCOPO_QUERY } } },
     }, async (req) => {
       const f = filtroEscopo(req.query);
-      const linhas = db.prepare(`SELECT ${COLUNAS} ${FROM} WHERE a.revogado = 0${f.sql} ORDER BY a.hostname COLLATE NOCASE`).all(...f.args);
+      const linhas = db.prepare(`SELECT ${COLUNAS} ${FROM} WHERE a.revogado = 0${f.sql} ORDER BY a.hostname COLLATE NOCASE`).all(...f.args).map(comCapacidades);
       const online = new Set(ctx.canalAgentes.conectados());
       for (const l of linhas) l.tempo_real = online.has(l.id);
       return ctx.servicos.agentes.enriquecer(linhas);
     });
 
     app.get('/api/agentes/:id', { preHandler: ver, schema: { params: PARAMS_AGENTE } }, async (req, reply) => {
-      const a = db.prepare(`SELECT ${COLUNAS}, a.discos_json, a.inventario_json, a.inventario_em, a.revogado, a.capacidades_json
+      const a = db.prepare(`SELECT ${COLUNAS}, a.discos_json, a.inventario_json, a.inventario_em, a.revogado
         ${FROM} WHERE a.id = ?`).get(req.params.id);
       if (!a) return reply.code(404).send({ erro: 'Dispositivo não encontrado' });
-      const { discos_json, inventario_json, capacidades_json, ...resto } = a;
+      const { discos_json, inventario_json, ...resto } = comCapacidades(a);
       const [linha] = ctx.servicos.agentes.enriquecer([{ ...resto, tempo_real: ctx.canalAgentes.conectado(a.id) }]);
       return {
         ...linha,
         discos: JSON.parse(discos_json || '[]'),
         inventario: inventario_json ? JSON.parse(inventario_json) : null,
-        capacidades: capacidades_json ? JSON.parse(capacidades_json) : [],
       };
     });
 

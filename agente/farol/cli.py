@@ -17,7 +17,7 @@ import psutil
 from . import VERSAO
 from .coleta import coletar_inventario, coletar_metricas, info_basica
 from .config import ErroConfig, caminho_config_padrao, carregar_config, salvar_config, validar_url_servidor
-from .execucao import executar_job
+from .execucao import executar_job, interpretadores_disponiveis
 from .http import Cliente, ErroHttp, ErroRede
 from .registro import REGISTRO, descobrir, executar_comando
 from .tempo_real import CanalTempoReal
@@ -42,9 +42,14 @@ class ContextoAgente:
             log.warning("não foi possível entregar o resultado do comando %s: %s", id_comando, e)
 
 
+def capacidades_atuais() -> list[str]:
+    """Comandos/sessões dos módulos + interpretadores de shell de fato presentes nesta máquina."""
+    return REGISTRO.capacidades() + interpretadores_disponiveis()
+
+
 def montar_checkin(servidor: str | None, com_inventario: bool, intervalo_cpu: float | None = None,
                    ctx: ContextoAgente | None = None, agora: float | None = None) -> dict:
-    payload = {"metricas": coletar_metricas(servidor, intervalo_cpu), "info": info_basica(REGISTRO.capacidades())}
+    payload = {"metricas": coletar_metricas(servidor, intervalo_cpu), "info": info_basica(capacidades_atuais())}
     if com_inventario:
         payload["inventario"] = coletar_inventario()
     extras = coletar_extras(ctx, agora or time.time())
@@ -102,7 +107,7 @@ def registrar_agente(args) -> int:
     cliente = Cliente(servidor)
     descobrir()
     try:
-        resp = cliente.post("/api/agente/registrar", {"token": args.token, "info": info_basica(REGISTRO.capacidades())})
+        resp = cliente.post("/api/agente/registrar", {"token": args.token, "info": info_basica(capacidades_atuais())})
     except ErroHttp as e:
         try:
             msg = json.loads(e.corpo).get("erro", e.corpo)

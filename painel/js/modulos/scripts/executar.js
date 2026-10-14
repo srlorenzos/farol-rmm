@@ -62,12 +62,20 @@ export function executarScript(o = {}) {
         const resumoAlvo = h('p', { class: 'sutil pequeno' });
         let escolhaAlvo = null;
 
+        // Shells cuja presença de verdade na máquina varia (python roda sempre: é o próprio interpretador do agente).
+        const SHELLS_VERIFICAVEIS = ['powershell', 'cmd', 'bash'];
+        /** Agente reportou a lista de interpretadores (agente novo o bastante) mas não tem o que o script pede. */
+        const semInterpretador = (a) => SHELLS_VERIFICAVEIS.includes(s.shell) && Array.isArray(a.capacidades)
+          && a.capacidades.some((c) => c.startsWith('interpretador:')) && !a.capacidades.includes(`interpretador:${s.shell}`);
+
         const desenharAlvo = () => {
           if (modoAlvo === 'fixos') {
             const incompat = agentesFixos.filter((a) => s.so?.length && soChave(a.so) && !s.so.includes(soChave(a.so)));
+            const semShell = agentesFixos.filter((a) => !incompat.includes(a) && semInterpretador(a));
             preencher(alvoArea, h('div', { class: 'chips' }, agentesFixos.slice(0, 12).map((a) => h('span', { class: 'chip' }, iconeSo(a.so), a.hostname)),
               agentesFixos.length > 12 ? h('span', { class: 'chip', text: `+${agentesFixos.length - 12}` }) : null),
-            incompat.length ? aviso(`${incompat.length} dispositivo(s) não são compatíveis com este script (${(s.so ?? []).map((x) => NOMES_SO[x]).join(', ')}) e serão ignorados.`, 'alerta') : null);
+            incompat.length ? aviso(`${incompat.length} dispositivo(s) não são compatíveis com este script (${(s.so ?? []).map((x) => NOMES_SO[x]).join(', ')}) e serão ignorados.`, 'alerta') : null,
+            semShell.length ? aviso(`${semShell.length} dispositivo(s) não têm ${NOMES_SHELL[s.shell] ?? s.shell} instalado (${semShell.slice(0, 5).map((a) => a.hostname).join(', ')}${semShell.length > 5 ? '…' : ''}): a execução falhará nele(s) com uma mensagem explicando como instalar.`, 'alerta') : null);
             escolhaAlvo = { agentes: agentesFixos.map((a) => a.id) };
             return;
           }

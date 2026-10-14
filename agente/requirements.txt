@@ -1,1 +1,10 @@
 psutil>=5.9
+
+# --- bandeja (ícone na área de notificação + chamados, agente/farol_bandeja.py) ---
+# Opcionais: o agente principal (farol_agente.py / farol-agente.pyz) funciona sem elas.
+pystray>=0.19
+Pillow>=10
+mss>=9
+# Só no Windows (é o foco da bandeja); em Linux/macOS ela cai sozinha no fallback do navegador
+# (webbrowser + servidor local), sem precisar de pywebview nem das bibliotecas de sistema que ele exige.
+pywebview>=4.4; sys_platform == "win32"
