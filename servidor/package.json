@@ -23,5 +23,8 @@
     "@fastify/websocket": "^11.3.3",
     "fastify": "^5.12.5",
     "ws": "^8.22.0"
+  },
+  "devDependencies": {
+    "jsqr": "^1.4.0"
   }
 }

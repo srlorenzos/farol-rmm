@@ -10,6 +10,7 @@ import { cabecalhoPagina, botao, campo, input, select, campoCodigo, aviso, selo,
 import { modal, confirmar, toast, toastErro } from '../../ui/camadas.js';
 import { comElevacao } from '../../ui/elevar.js';
 import { abrirMenu } from '../../ui/flutuante.js';
+import { qrCodeSvg } from './qr-svg.js';
 
 const PAPEIS = { admin: 'Administrador', tecnico: 'Técnico', leitura: 'Somente leitura' };
 
@@ -59,12 +60,17 @@ function secaoConta(el) {
         },
         h('ol', { class: 'passos' },
           h('li', {}, 'Abra seu aplicativo autenticador (Google Authenticator, Aegis, 1Password, Bitwarden…).'),
-          h('li', {}, 'Adicione uma conta manualmente com a chave abaixo (baseada em tempo) ou cole a URI otpauth.'),
+          h('li', {}, 'Escaneie o QR Code abaixo (ou use a chave/URI, se não conseguir escanear).'),
           h('li', {}, 'Digite o código de 6 dígitos que aparecer.')),
-        h('div', { class: 'campo' }, h('span', { class: 'rotulo', text: 'Chave secreta' }),
-          h('div', { class: 'linha' }, h('code', { class: 'token-texto', text: r.segredo.match(/.{1,4}/g).join(' ') }), botaoCopiar(r.segredo, 'Copiar chave', { toast }))),
-        h('div', { class: 'campo' }, h('span', { class: 'rotulo', text: 'URI otpauth' }),
-          h('div', { class: 'linha' }, h('code', { class: 'token-texto pequeno', text: r.uri }), botaoCopiar(r.uri, 'Copiar URI', { toast }))),
+        h('div', { class: 'linha', estilo: { justifyContent: 'center', padding: '8px 0' } },
+          h('div', { estilo: { padding: '12px', background: '#fff', borderRadius: '12px', border: '1px solid var(--borda)' } },
+            qrCodeSvg(r.uri, { tamanhoPx: 200 }))),
+        h('details', { class: 'mt-2' }, h('summary', {}, 'Não consigo escanear: usar a chave ou a URI'),
+          h('div', { class: 'pilha mt-2' },
+            h('div', { class: 'campo' }, h('span', { class: 'rotulo', text: 'Chave secreta' }),
+              h('div', { class: 'linha' }, h('code', { class: 'token-texto', text: r.segredo.match(/.{1,4}/g).join(' ') }), botaoCopiar(r.segredo, 'Copiar chave', { toast }))),
+            h('div', { class: 'campo' }, h('span', { class: 'rotulo', text: 'URI otpauth' }),
+              h('div', { class: 'linha' }, h('code', { class: 'token-texto pequeno', text: r.uri }), botaoCopiar(r.uri, 'Copiar URI', { toast }))))),
         campo('Código', codigo), erro, h('div', {}, botao('Ativar 2FA', { variante: 'primario', tipo: 'submit' })));
         preencher(area2fa, form);
         codigo.focus();
