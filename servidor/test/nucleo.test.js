@@ -154,9 +154,11 @@ test('alvos: agente, site, cliente, todos e resolvedor registrado por módulo', 
   assert.deepEqual(await nomes({ tipo: 'cliente', id: cli.id }), ['caixa-01', 'caixa-02']);
   assert.deepEqual(await nomes({ tipo: 'todos' }), ['caixa-01', 'caixa-02', 'matriz-srv']);
   assert.deepEqual(await nomes([{ tipo: 'site', id: 1 }, { tipo: 'agente', id: a1.id }]), ['caixa-01', 'matriz-srv'], 'união sem duplicatas');
-  await assert.rejects(ctx.alvos.resolver({ tipo: 'grupo', id: 1 }), /desconhecido/);
-  ctx.alvos.registrar('grupo', (id) => (id === 7 ? [a2.id, a3.id] : []));
-  assert.deepEqual(await nomes({ tipo: 'grupo', id: 7 }), ['caixa-02', 'matriz-srv']);
+  // 'grupo' já é registrado de verdade pelo módulo grupos (grupos dinâmicos) — o tipo desconhecido do teste
+  // precisa de um nome que nenhum módulo registre, só pra exercitar o erro "tipo de alvo desconhecido".
+  await assert.rejects(ctx.alvos.resolver({ tipo: 'tipo-inexistente', id: 1 }), /desconhecido/);
+  ctx.alvos.registrar('equipe', (id) => (id === 7 ? [a2.id, a3.id] : []));
+  assert.deepEqual(await nomes({ tipo: 'equipe', id: 7 }), ['caixa-02', 'matriz-srv']);
   // revogado some do alvo
   await c.post(`/api/agentes/${a2.id}/revogar`);
   assert.deepEqual(await nomes({ tipo: 'site', id: siteSol }), ['caixa-01']);
