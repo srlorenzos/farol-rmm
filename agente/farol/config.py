@@ -28,6 +28,12 @@ def caminho_config_padrao() -> Path:
     return Path.home() / ".config" / "farol" / "config.json"
 
 
+def caminho_log_padrao() -> Path:
+    """Mesma pasta da config (ou FAROL_CONFIG, se definida) — sempre existe um log ali, mesmo em falha de
+    instalação, pra nunca mais faltar o que diagnosticar (ver cli._configurar_log)."""
+    return caminho_config_padrao().with_name("agente.log")
+
+
 def _host_local(host: str) -> bool:
     if host in ("localhost",):
         return True

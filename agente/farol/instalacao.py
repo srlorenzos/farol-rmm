@@ -154,22 +154,33 @@ def _remover_servico(nome: str) -> None:
 
 
 def _instalar_servico(nome: str, exe: Path, config: Path | None) -> None:
-    import win32service
-    import win32serviceutil
+    """Levanta ErroInstalacao com o motivo real em QUALQUER falha — falta do pywin32, SCM sem acesso (sem
+    admin de verdade, mesmo com eh_admin() dizendo que sim), nome duplicado, o que for. Nunca deixa uma
+    exceção crua (pywintypes.error, ImportError...) escapar sem virar uma mensagem que o usuário entende."""
+    try:
+        import win32service
+        import win32serviceutil
+    except ImportError as e:
+        raise ErroInstalacao(f"o módulo pywin32 não está disponível neste executável ({e})") from e
 
-    args = "servico" + (f' --config "{config}"' if config else "") + f" --nome-servico {nome}"
-    if _servico_existe(nome):
-        _remover_servico(nome)
-        time.sleep(1)
-    win32serviceutil.InstallService(
-        None, nome, NOME_EXIBICAO, startType=win32service.SERVICE_AUTO_START,
-        exeName=str(exe), exeArgs=args, description=DESCRICAO)
-    # Recuperação: reinicia em 5 s, 5 s e 30 s; zera o contador depois de 1 dia; vale também para saída com erro.
-    _rodar(["sc.exe", "failure", nome, "reset=", "86400", "actions=", "restart/5000/restart/5000/restart/30000"])
-    _rodar(["sc.exe", "failureflag", nome, "1"])
-    r = _rodar(["sc.exe", "start", nome])
-    if r.returncode not in (0, 1056):
-        raise ErroInstalacao(f"o serviço foi criado mas não iniciou: {r.stdout.strip() or r.stderr.strip()}")
+    try:
+        args = "servico" + (f' --config "{config}"' if config else "") + f" --nome-servico {nome}"
+        if _servico_existe(nome):
+            _remover_servico(nome)
+            time.sleep(1)
+        win32serviceutil.InstallService(
+            None, nome, NOME_EXIBICAO, startType=win32service.SERVICE_AUTO_START,
+            exeName=str(exe), exeArgs=args, description=DESCRICAO)
+        # Recuperação: reinicia em 5 s, 5 s e 30 s; zera o contador depois de 1 dia; vale também para saída com erro.
+        _rodar(["sc.exe", "failure", nome, "reset=", "86400", "actions=", "restart/5000/restart/5000/restart/30000"])
+        _rodar(["sc.exe", "failureflag", nome, "1"])
+        r = _rodar(["sc.exe", "start", nome])
+        if r.returncode not in (0, 1056):
+            raise ErroInstalacao(f"o serviço foi criado mas não iniciou: {r.stdout.strip() or r.stderr.strip()}")
+    except ErroInstalacao:
+        raise
+    except Exception as e:  # noqa: BLE001 - qualquer erro do SCM/pywin32 vira uma mensagem legível, nunca some
+        raise ErroInstalacao(f"não foi possível criar o serviço do Windows ({nome}): {e}") from e
 
 
 def _xml_tarefa(exe: Path, config: Path | None) -> str:
@@ -201,13 +212,20 @@ def _xml_tarefa(exe: Path, config: Path | None) -> str:
 
 
 def _instalar_tarefa(exe: Path, config: Path | None) -> None:
-    with tempfile.NamedTemporaryFile("w", suffix=".xml", delete=False, encoding="utf-16") as f:
-        f.write(_xml_tarefa(exe, config))
-        xml = f.name
+    try:
+        with tempfile.NamedTemporaryFile("w", suffix=".xml", delete=False, encoding="utf-16") as f:
+            f.write(_xml_tarefa(exe, config))
+            xml = f.name
+    except OSError as e:
+        raise ErroInstalacao(f"não foi possível preparar o XML da tarefa agendada: {e}") from e
     try:
         r = _rodar(["schtasks.exe", "/Create", "/TN", NOME_TAREFA, "/XML", xml, "/F"])
         if r.returncode != 0:
             raise ErroInstalacao(f"não foi possível criar a tarefa agendada: {r.stdout.strip() or r.stderr.strip()}")
+    except ErroInstalacao:
+        raise
+    except Exception as e:  # noqa: BLE001 - idem _instalar_servico: nunca deixa escapar sem mensagem legível
+        raise ErroInstalacao(f"não foi possível criar a tarefa agendada: {e}") from e
     finally:
         os.unlink(xml)
     _rodar(["schtasks.exe", "/Run", "/TN", NOME_TAREFA])
@@ -339,23 +357,49 @@ def instalar_completo(args, registrar) -> int:
             _dizer(f"Configuração existente mantida ({config}); atualizando os arquivos e o serviço.")
 
         _dizer(f"Copiando arquivos para {destino} ...")
-        modo_tarefa = eh_onefile() or args.modo == "tarefa"
-        if modo_tarefa:
-            _remover_tarefa()
-        else:
-            _parar_servico(nome)
+        # Serviço é parado e a tarefa é removida de qualquer forma (upgrade pode estar vindo de qualquer um
+        # dos dois) — evita arquivo em uso ao copiar, e nenhum dos dois é problema remover se nem existia.
+        _parar_servico(nome)
+        _remover_tarefa()
         _encerrar_bandeja()
         exe, bandeja = _copiar_arquivos(destino)
         cfg_arg = config if args.config else None
 
-        if modo_tarefa:
-            _dizer("Registrando a tarefa agendada (SYSTEM, na inicialização) ...")
-            _instalar_tarefa(exe, cfg_arg)
-            modo = "Tarefa Agendada"
+        # Sem --modo explícito, tenta o jeito preferido (serviço, ou tarefa no exe de arquivo único) e, se
+        # falhar por QUALQUER motivo (sem pywin32, SCM sem acesso mesmo com eh_admin()==True, o que for),
+        # tenta o outro jeito automaticamente — nunca silenciosamente "sem nada rodando depois de instalar".
+        # Com --modo, respeita a escolha explícita: uma tentativa só, erro claro se falhar.
+        if args.modo:
+            ordem = [args.modo]
+        elif eh_onefile():
+            ordem = ["tarefa", "servico"]
         else:
-            _dizer(f'Registrando o serviço "{NOME_EXIBICAO}" ({nome}) ...')
-            _instalar_servico(nome, exe, cfg_arg)
-            modo = "serviço do Windows"
+            ordem = ["servico", "tarefa"]
+
+        modo = None
+        falhas = []
+        for i, modo_tentativa in enumerate(ordem):
+            rotulo = "Tarefa Agendada" if modo_tentativa == "tarefa" else f'serviço "{NOME_EXIBICAO}" ({nome})'
+            _dizer(f"Registrando {rotulo} ...")
+            try:
+                if modo_tentativa == "tarefa":
+                    _instalar_tarefa(exe, cfg_arg)
+                    modo = "Tarefa Agendada"
+                else:
+                    _instalar_servico(nome, exe, cfg_arg)
+                    modo = "serviço do Windows"
+                break
+            except ErroInstalacao as e:
+                log.error("%s", e)
+                falhas.append(f"{rotulo}: {e}")
+                if i + 1 < len(ordem):
+                    _dizer(f"Não deu certo ({e}). Tentando o outro jeito de deixar o agente rodando em segundo plano...")
+
+        if modo is None:
+            raise ErroInstalacao(
+                "Não foi possível deixar o agente rodando em segundo plano — " + " | ".join(falhas) + ". "
+                f"O dispositivo FOI registrado no servidor ({config}), mas NADA vai ficar rodando até você "
+                f'resolver isto: rode o instalador como Administrador, ou inicie manualmente com "{exe} rodar".')
 
         if bandeja:
             registrar_autostart(bandeja)

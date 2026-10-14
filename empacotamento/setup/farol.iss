@@ -158,8 +158,9 @@ begin
     begin
       Log('farol-agente.exe instalar terminou com código ' + IntToStr(Codigo));
       if not WizardSilent() then
-        SuppressibleMsgBox('Os arquivos foram copiados, mas o registro no servidor ou a criação do serviço falhou '
-          + '(código ' + IntToStr(Codigo) + '). Confira a URL e o token (o token vale uma vez só) e rode o instalador de novo.',
+        SuppressibleMsgBox('Os arquivos foram copiados, mas o registro no servidor ou a criação do serviço/tarefa falhou '
+          + '(código ' + IntToStr(Codigo) + '). Confira a URL e o token (o token vale uma vez só), e veja o motivo exato em '
+          + '%ProgramData%\Farol\agente.log antes de rodar o instalador de novo.',
           mbError, MB_OK, IDOK);
     end;
   end;

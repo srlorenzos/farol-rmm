@@ -108,7 +108,7 @@ FarolAgenteSetup.exe /VERYSILENT /SUPPRESSMSGBOXES /SERVIDOR=https://farol.exemp
 
 O token vale uma vez só e por 24 h: para muitas máquinas, gere um por máquina (ou um por lote, dentro da validade e usando a API). Sem `/TOKEN`, o Setup só atualiza uma instalação existente e mantém a configuração. O painel já mostra esse comando na aba "Windows (Setup.exe)" do diálogo de novo dispositivo; troque a origem do download com a variável `FAROL_SETUP_URL` no servidor, se hospedar o Setup em outro lugar.
 
-**Sem o Setup**, direto pelo exe (pede elevação via UAC sozinho):
+**Sem o Setup**, direto pelo exe — **precisa ser Administrador** (sem admin, ele pede elevação via UAC sozinho e espera você responder; sem ninguém pra clicar "Sim", como num script não interativo, fica esperando o prompt):
 
 ```powershell
 .\farol-agente.exe instalar --servidor https://farol.exemplo.com.br --token <TOKEN>
@@ -117,7 +117,9 @@ O token vale uma vez só e por 24 h: para muitas máquinas, gere um por máquina
 .\farol-agente.exe desinstalar --manter-config  # remove tudo menos a configuração
 ```
 
-O serviço é um serviço Windows de verdade, hospedado pelo próprio agente via pywin32. Isso exige o build em pasta (o que o Setup instala); o `farol-agente.exe` de arquivo único usa como plano B uma Tarefa Agendada como SYSTEM na inicialização, com reinício em falha, e informa qual modo usou.
+O serviço é um serviço Windows de verdade, hospedado pelo próprio agente via pywin32. Isso exige o build em pasta (o que o Setup instala); o `farol-agente.exe` de arquivo único usa como plano B uma Tarefa Agendada como SYSTEM na inicialização, com reinício em falha. O instalador tenta primeiro o modo preferido (serviço, ou tarefa no exe de arquivo único) e, se falhar por qualquer motivo, **tenta o outro automaticamente**; só termina com erro (código de saída ≠ 0) se nenhum dos dois der certo — nesse caso ele nunca finge sucesso: a mensagem final explica os dois motivos e diz que nada ficará rodando até você resolver (rodar como Administrador, ou iniciar manualmente com `farol-agente.exe rodar`). Use `--modo servico` ou `--modo tarefa` para forçar um só, sem tentar o outro.
+
+**Diagnóstico:** toda execução (instalação, remoção, `status`, `rodar`...) grava em `agente.log` na mesma pasta da configuração (`%ProgramData%\Farol\agente.log` no caso comum; cai para `%TEMP%\farol-agente.log` se não conseguir escrever ali), além do console — então uma instalação que falhou silenciosamente no console (ex.: via Setup `/VERYSILENT`, que roda escondido) sempre deixa rastro nesse arquivo.
 
 **Servidor em um exe:** `farol-servidor.exe` extrai o painel e a biblioteca para `%ProgramData%\FarolServidor` (ou `FAROL_DADOS`), guarda lá o banco e um `.env` opcional. `farol-servidor.exe criar-admin --usuario U --senha S` cria o administrador; `instalar-tarefa` (como administrador) faz o servidor subir com o Windows. As variáveis `PORT`, `HOST`, `URL_PUBLICA` etc. funcionam como no servidor normal.
 

@@ -5,9 +5,11 @@ import argparse
 import concurrent.futures
 import json
 import logging
+import logging.handlers
 import random
 import signal
 import sys
+import tempfile
 import threading
 import time
 from pathlib import Path
@@ -16,7 +18,7 @@ import psutil
 
 from . import VERSAO
 from .coleta import coletar_inventario, coletar_metricas, info_basica
-from .config import ErroConfig, caminho_config_padrao, carregar_config, salvar_config, validar_url_servidor
+from .config import ErroConfig, caminho_config_padrao, caminho_log_padrao, carregar_config, salvar_config, validar_url_servidor
 from .execucao import executar_job, interpretadores_disponiveis
 from .http import Cliente, ErroHttp, ErroRede
 from .registro import REGISTRO, descobrir, executar_comando
@@ -264,6 +266,43 @@ def _opcoes_windows(p) -> None:
     p.add_argument("--elevado", action="store_true", help=argparse.SUPPRESS)
 
 
+def _configurar_log(verbose: bool) -> None:
+    """Console sempre; arquivo (mesma pasta da config) sempre que der. Sem isto, uma falha na instalação
+    (serviço, tarefa agendada, UAC) não deixava NENHUM rastro em disco — só no console, que em instalação
+    silenciosa/via Setup (SW_HIDE) ninguém vê. Nunca deixa a falta de permissão de escrita derrubar o agente:
+    na pior das hipóteses, cai para %TEMP%, e se nem isso der, segue só com o console."""
+    nivel = logging.DEBUG if verbose else logging.INFO
+    raiz = logging.getLogger()
+    raiz.setLevel(nivel)
+    fmt = logging.Formatter("%(asctime)s %(levelname)s %(message)s")
+    console = logging.StreamHandler()
+    console.setFormatter(fmt)
+    raiz.addHandler(console)
+
+    for caminho in (caminho_log_padrao(), Path(tempfile.gettempdir()) / "farol-agente.log"):
+        try:
+            caminho.parent.mkdir(parents=True, exist_ok=True)
+            arquivo = logging.handlers.RotatingFileHandler(caminho, maxBytes=2_000_000, backupCount=3, encoding="utf-8")
+            arquivo.setFormatter(fmt)
+            raiz.addHandler(arquivo)
+            if caminho != caminho_log_padrao():
+                log.warning("sem permissão em %s; gravando o log em %s", caminho_log_padrao(), caminho)
+            return
+        except OSError as e:
+            log.debug("não foi possível abrir o log em %s: %s", caminho, e)
+    log.warning("não foi possível gravar log em arquivo (nem na pasta da config, nem em %%TEMP%%); só console")
+
+
+def _argv_para_log(argv: list[str]) -> str:
+    """Mesma lista de argumentos, com o valor de --token mascarado (ele vale uma vez só, mas não precisa
+    ficar em texto puro no log mesmo assim)."""
+    r = list(argv)
+    for i, a in enumerate(r):
+        if a == "--token" and i + 1 < len(r):
+            r[i + 1] = "***"
+    return " ".join(r)
+
+
 def _sem_argumentos(p) -> int:
     """Duplo clique no exe: mostra a ajuda e espera, em vez de a janela sumir."""
     p.print_help()
@@ -315,8 +354,8 @@ def main(argv=None) -> int:
     if argv is None and len(sys.argv) == 1 and getattr(sys, "frozen", False):
         return _sem_argumentos(p)
     args = p.parse_args(argv)
-    logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO,
-                        format="%(asctime)s %(levelname)s %(message)s")
+    _configurar_log(args.verbose)
+    log.info("farol-agente v%s: comando '%s' %s", VERSAO, args.comando, _argv_para_log(argv or sys.argv[1:]))
     try:
         if args.comando == "instalar":
             return cmd_instalar(args)
@@ -335,3 +374,7 @@ def main(argv=None) -> int:
     except ErroConfig as e:
         log.error("%s", e)
         return 2
+    except Exception as e:  # noqa: BLE001 - nunca deixa um erro inesperado sumir sem log, mensagem e código != 0
+        log.exception("erro inesperado em '%s'", args.comando)
+        print(f"Erro inesperado: {e}\nDetalhes em {caminho_log_padrao()}", file=sys.stderr)
+        return 1
