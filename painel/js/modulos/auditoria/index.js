@@ -21,9 +21,15 @@ export const ROTULOS = {
   cliente_criado: 'Cliente criado', cliente_alterado: 'Cliente alterado', cliente_excluido: 'Cliente excluído',
   site_criado: 'Site criado', site_alterado: 'Site alterado', site_excluido: 'Site excluído',
   relay_aberto: 'Sessão remota aberta', relay_fechado: 'Sessão remota encerrada', biblioteca_recarregada: 'Biblioteca recarregada',
+  manutencao_criada: 'Janela de manutenção criada', manutencao_cancelada: 'Janela de manutenção cancelada',
+  alerta_override_definido: 'Exceção de alerta definida', alerta_override_removido: 'Exceção de alerta removida',
+  chamado_aberto: 'Chamado aberto', chamado_respondido: 'Chamado respondido', chamado_alterado: 'Chamado alterado',
+  bandeja_config_alterada: 'Configuração da bandeja alterada', terminal_config_alterada: 'Configuração do terminal alterada',
+  usuario_convidado: 'Usuário convidado', redefinicao_solicitada: 'Redefinição de senha solicitada',
+  convite_aceito: 'Convite aceito', senha_redefinida: 'Senha redefinida',
 };
 const SENSIVEIS = new Set(['login_falha', 'login_bloqueado', 'agente_registro_negado', 'elevacao_falha', 'agente_revogado', 'script_executado',
-  'comando_executado', 'dispositivo_reiniciar', 'dispositivo_desligar', 'relay_aberto', 'usuario_excluido']);
+  'comando_executado', 'dispositivo_reiniciar', 'dispositivo_desligar', 'relay_aberto', 'usuario_excluido', 'manutencao_criada', 'manutencao_cancelada']);
 
 function resumo(detalhes) {
   if (!detalhes) return '—';
