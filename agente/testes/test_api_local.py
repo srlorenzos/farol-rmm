@@ -288,6 +288,15 @@ class ApiLocalTestCase(unittest.TestCase):
         self.assertEqual(len(corpo["itens"]), 1)
         self.assertEqual(corpo["itens"][0]["chamado_id"], 5)
 
+    def test_comando_tela_notificar_enfileira_aviso_tipado(self):
+        from farol.registro import executar_comando
+        resultado = executar_comando(self.ctx, "tela.notificar", {"usuario": "tec1"})
+        self.assertTrue(resultado["ok"])
+        status, corpo = self._pedir("GET", "/api/notificacoes")
+        self.assertEqual(len(corpo["itens"]), 1)
+        self.assertEqual(corpo["itens"][0]["tipo"], "tela_remota")
+        self.assertEqual(corpo["itens"][0]["usuario"], "tec1")
+
 
 class TokenArquivoTestCase(unittest.TestCase):
     def test_gravar_e_restringir_token_em_arquivo_temporario(self):

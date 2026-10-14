@@ -109,6 +109,29 @@ test('tela: permissão negada para leitura; exige 2FA/elevação pro técnico', 
   await app.close();
 });
 
+test('tela: ao abrir, avisa a bandeja do dispositivo (comando tela.notificar, best-effort)', async () => {
+  const { app, db, base } = await subir();
+  const { c } = await adminElevado(app, db);
+  const ag = await registrarAgente(app, c);
+  await ag.checkin(metricas());
+  const agente = agenteFalso(base, ag);
+  await agente.aberto;
+
+  const painel = conectar(`ws://${base}/api/ws`, { cookie: c.cookie, origin: `http://${base}` });
+  await painel.aberto;
+  await painel.esperar((m) => m.tipo === 'ola');
+  painel.enviar({ t: 'relay.abrir', ref: 'r1', agente_id: ag.id, tipo: 'tela' });
+  await painel.esperar((m) => m.tipo === 'relay' && m.dados.e === 'aberta' && m.dados.ref === 'r1');
+
+  const comando = await agente.esperar((m) => m.t === 'cmd' && m.tipo === 'tela.notificar');
+  assert.equal(comando.args.usuario, 'admin');
+  const linha = db.prepare("SELECT * FROM comandos WHERE tipo = 'tela.notificar'").get();
+  assert.ok(linha, 'fica registrado na tabela comandos, igual qualquer outro comando tipado');
+
+  agente.ws.close();
+  await app.close();
+});
+
 test('tela: só 1 sessão por dispositivo ao mesmo tempo (maxPorAgente)', async () => {
   const { app, db, base } = await subir();
   const { c } = await adminElevado(app, db);

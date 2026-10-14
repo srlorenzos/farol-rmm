@@ -83,6 +83,10 @@ class AplicacaoBandeja:
                 self.bandeja.definir_status(status, titulo=f"Suporte — {'conectado' if conectado else 'desconectado'}")
             try:
                 for n in self.cliente.notificacoes():
+                    if n.get("tipo") == "tela_remota":
+                        if self.bandeja:
+                            self.bandeja.notificar("Farol", "Alguém está vendo e pode controlar esta tela remotamente agora.")
+                        continue
                     tem_resposta_nao_lida = True
                     if self.bandeja:
                         self.bandeja.definir_status("resposta")

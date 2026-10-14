@@ -40,6 +40,8 @@ export class Relay {
       s.estado = 'aberta';
       clearTimeout(s.timer);
       this.#paraPainel(s, { e: 'aberta', ref: s.ref });
+      const def = this.tipos.get(s.tipo);
+      if (def?.aoAbrir) { try { def.aoAbrir({ id: s.id, agenteId: s.agenteId, hostname: s.hostname, usuario: s.usuario }); } catch (e) { this.ctx.log?.error?.(e); } }
     });
     canalAgentes.aoMensagem('relay.erro', (msg, agenteId) => {
       const s = this.sessoes.get(msg.sessao);
@@ -67,11 +69,13 @@ export class Relay {
   // esse número de sessões do mesmo tipo abertas/abrindo no MESMO agente (ex.: tela remota — 1 por vez, pra
   // não ter duas pessoas brigando pelo mouse do mesmo dispositivo). Sem o limite, padrão de sempre (várias
   // sessões, como o terminal já permite).
-  registrarTipo(tipo, { permissao, elevado = false, descricao = tipo, aoDados = null, maxPorAgente = null } = {}) {
+  // `aoAbrir(sessaoInfo)` é opcional: chamado quando o agente confirma que a sessão abriu de verdade (ex.:
+  // tela remota avisa a bandeja do dispositivo que alguém está vendo a tela, se ela estiver rodando).
+  registrarTipo(tipo, { permissao, elevado = false, descricao = tipo, aoDados = null, maxPorAgente = null, aoAbrir = null } = {}) {
     if (!/^[a-z][a-z0-9-]*$/.test(tipo)) throw new Error(`Tipo de relay inválido "${tipo}"`);
     if (this.tipos.has(tipo)) throw new Error(`Tipo de relay "${tipo}" já registrado`);
     if (!permissao) throw new Error(`Tipo de relay "${tipo}" precisa declarar a permissão exigida`);
-    this.tipos.set(tipo, { permissao, elevado, descricao, aoDados, maxPorAgente });
+    this.tipos.set(tipo, { permissao, elevado, descricao, aoDados, maxPorAgente, aoAbrir });
   }
 
   #notificarDados(s, direcao, dados) {

@@ -417,6 +417,19 @@ def _notificar(args: dict, _ctx) -> dict:
     return {"ok": True}
 
 
+@comando("tela.notificar")
+def _notificar_tela_remota(args: dict, _ctx) -> dict:
+    """Avisa (best-effort; sem bandeja rodando, o comando só expira sem efeito — a sessão de tela remota
+    continua normal) que alguém abriu uma sessão de tela remota neste dispositivo agora — pra quem está na
+    frente da máquina saber que está sendo vista/controlada. Mesma fila que chamados.notificar; a bandeja
+    diferencia pelo campo "tipo" ao mostrar o toast."""
+    with _estado["trava"]:
+        _estado["notificacoes"].append({
+            "tipo": "tela_remota", "usuario": args.get("usuario"), "recebido_em": time.time(),
+        })
+    return {"ok": True}
+
+
 @coletor("bandeja", intervalo=15)
 def _coletor(ctx) -> None:
     """Roda a cada check-in (não precisa de nenhum gancho novo no núcleo do agente): guarda o `ctx` para a
