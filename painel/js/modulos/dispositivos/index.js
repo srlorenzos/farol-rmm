@@ -16,6 +16,7 @@ import { abaResumo, abaMonitoramento, abaInventario, abaSoftware } from './abas.
 import { adicionarDispositivo } from './instalar.js';
 import { celulaDispositivo, listarDispositivos, nomeSo, invalidarCache } from './comum.js';
 import { itensAcoes } from './acoes.js';
+import { abrirTerminal } from './terminal.js';
 
 let resumoCache = { chave: '', em: 0, p: null };
 function resumo() {
@@ -86,7 +87,8 @@ export default {
     } });
 
     // ---------- ações ----------
-    farol.acaoDispositivo({ id: 'terminal', rotulo: 'Terminal', icone: 'terminal', ordem: 20, emBreve: true, permissao: 'dispositivos.ver' });
+    farol.acaoDispositivo({ id: 'terminal', rotulo: 'Terminal', icone: 'terminal', ordem: 20, permissao: 'terminal.usar',
+      disponivel: (a) => a.status === 'online', executar: (a) => abrirTerminal(a) });
     farol.acaoDispositivo({ id: 'tela', rotulo: 'Tela remota', icone: 'tela', ordem: 30, emBreve: true, permissao: 'dispositivos.ver' });
     farol.acaoDispositivo({ id: 'mover', rotulo: 'Mover para outro site', icone: 'mover', ordem: 60, menu: true, permissao: 'dispositivos.editar',
       executar: (a, ctx) => escolherSite(`Mover ${a.hostname}`, async (site) => {
