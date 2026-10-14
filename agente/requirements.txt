@@ -1,10 +1,14 @@
 psutil>=5.9
 
-# --- bandeja (ícone na área de notificação + chamados, agente/farol_bandeja.py) ---
-# Opcionais: o agente principal (farol_agente.py / farol-agente.pyz) funciona sem elas.
-pystray>=0.19
+# Pillow e mss também são usados pela tela remota (farol/modulos/tela.py, captura+compressão JPEG) no
+# agente principal, não só pela bandeja — mas continuam "opcionais" no sentido de que o agente sobe sem
+# elas; só a sessão de tela remota fica indisponível (log claro, resto do agente funciona normal).
 Pillow>=10
 mss>=9
+
+# --- bandeja (ícone na área de notificação + chamados, agente/farol_bandeja.py) ---
+# Opcional: o agente principal (farol_agente.py / farol-agente.pyz) funciona sem ela.
+pystray>=0.19
 # Só no Windows (é o foco da bandeja); em Linux/macOS ela cai sozinha no fallback do navegador
 # (webbrowser + servidor local), sem precisar de pywebview nem das bibliotecas de sistema que ele exige.
 pywebview>=4.4; sys_platform == "win32"

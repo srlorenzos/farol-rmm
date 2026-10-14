@@ -63,11 +63,15 @@ export class Relay {
 
   // `aoDados(direcao, sessaoInfo, dados)` é opcional: observador de dados da sessão (ex.: gravação opt-in de
   // terminal). Não altera o fluxo; exceções são isoladas para não derrubar o relay.
-  registrarTipo(tipo, { permissao, elevado = false, descricao = tipo, aoDados = null } = {}) {
+  // `maxPorAgente` é opcional: quando definido, recusa abrir uma sessão NOVA deste tipo enquanto já houver
+  // esse número de sessões do mesmo tipo abertas/abrindo no MESMO agente (ex.: tela remota — 1 por vez, pra
+  // não ter duas pessoas brigando pelo mouse do mesmo dispositivo). Sem o limite, padrão de sempre (várias
+  // sessões, como o terminal já permite).
+  registrarTipo(tipo, { permissao, elevado = false, descricao = tipo, aoDados = null, maxPorAgente = null } = {}) {
     if (!/^[a-z][a-z0-9-]*$/.test(tipo)) throw new Error(`Tipo de relay inválido "${tipo}"`);
     if (this.tipos.has(tipo)) throw new Error(`Tipo de relay "${tipo}" já registrado`);
     if (!permissao) throw new Error(`Tipo de relay "${tipo}" precisa declarar a permissão exigida`);
-    this.tipos.set(tipo, { permissao, elevado, descricao, aoDados });
+    this.tipos.set(tipo, { permissao, elevado, descricao, aoDados, maxPorAgente });
   }
 
   #notificarDados(s, direcao, dados) {
@@ -91,6 +95,10 @@ export class Relay {
     if (!this.ctx.canalAgentes.conectado(agente.id)) return erro('O dispositivo não está conectado em tempo real');
     const abertas = [...this.sessoes.values()].filter((s) => s.conexao === conexao).length;
     if (abertas >= MAX_SESSOES_POR_CONEXAO) return erro('Sessões demais abertas nesta aba');
+    if (def.maxPorAgente != null) {
+      const doMesmoTipo = [...this.sessoes.values()].filter((s) => s.agenteId === agente.id && s.tipo === msg.tipo).length;
+      if (doMesmoTipo >= def.maxPorAgente) return erro(`Já existe uma sessão de ${def.descricao} aberta neste dispositivo`);
+    }
 
     const id = randomUUID();
     const agora = Date.now();
