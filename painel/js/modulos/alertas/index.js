@@ -9,6 +9,8 @@ import { cabecalhoPagina, chipsFiltro, busca, severidade, selo, vazio, skeleton,
 import { tabelaVirtual } from '../../ui/tabela-virtual.js';
 import { composicao } from '../../ui/graficos.js';
 import { toast, toastErro, modal } from '../../ui/camadas.js';
+import { formularioVariaveis } from '../../ui/formulario.js';
+import { comElevacao } from '../../ui/elevar.js';
 
 const TIPOS = { cpu: 'CPU', ram: 'Memória', disco: 'Disco', offline: 'Offline' };
 const nomeTipo = (t) => TIPOS[t] ?? t.replace(/^monitor:/, 'Monitor: ');
@@ -294,6 +296,116 @@ function widgetSeveridade(el) {
   return aoEvento('alerta', debounce(desenhar, 500));
 }
 
+/** Picker compacto de script (meus/biblioteca), igual ao 1º passo de "Executar script", só que num modal. */
+function abrirEscolherScript() {
+  return modal({
+    titulo: 'Escolher script', largura: 'md',
+    conteudo: (fechar) => {
+      const lista = h('div', {}, skeleton(6));
+      const campoBusca = busca('Buscar em seus scripts e na biblioteca…');
+      let fonte = 'meus';
+      const itens = { meus: null, biblioteca: null };
+      const render = () => {
+        const t = normalizar(campoBusca.input.value).split(/\s+/).filter(Boolean);
+        const dados = (itens[fonte] ?? []).filter((s) => t.every((x) => normalizar(`${s.nome} ${s.descricao} ${s.categoria}`).includes(x)));
+        preencher(lista, itens[fonte] == null ? skeleton(6) : dados.length ? h('ul', { class: 'lista-linhas cartao' }, dados.slice(0, 80).map((s) => h('li', {},
+          h('button', { class: 'linha-item', type: 'button', onclick: () => fechar({ ...s, origem: fonte === 'meus' ? 'script' : 'biblioteca', timeout: s.timeout ?? s.tempo_limite }) },
+            h('div', { class: 'linha-texto' }, h('span', { class: 'forte', text: s.nome }), h('small', { text: s.descricao || s.categoria }))))))
+          : h('p', { class: 'sutil pequeno centro', text: 'Nenhum script encontrado.' }));
+      };
+      const carregar = async (f) => {
+        if (itens[f]) return render();
+        try { itens[f] = f === 'meus' ? await get('/api/scripts') : (await get('/api/biblioteca')).itens; } catch (e) { toastErro(e); itens[f] = []; }
+        render();
+      };
+      campoBusca.input.addEventListener('input', debounce(render, 100));
+      carregar('meus');
+      return h('div', { class: 'pilha' }, h('div', { class: 'linha' }, segmentado([['meus', 'Meus scripts'], ['biblioteca', 'Biblioteca']], fonte, (v) => { fonte = v; carregar(v); }, 'Origem')),
+        campoBusca.el, lista);
+    },
+  }).promessa;
+}
+
+/** Um cartão de resposta automática (um dos 4 tipos: cpu/ram/disco/offline). */
+function blocoResposta(tipo, nome, atual, podeEditar) {
+  let escolhido = null;
+  const estadoVars = atual.variaveis ?? {};
+  const sw = interruptor(`Rodar script quando abrir`, { marcado: atual.ativo });
+  sw.input.disabled = !podeEditar;
+  const areaScript = h('div', { class: 'mt-2' });
+  const varsArea = h('div', {});
+  const limite = input({ tipo: 'number', classe: 'input-curto', valor: atual.limiteMinutos ?? 0, attrs: { min: 0, max: 10080, disabled: !podeEditar } });
+  let varsCtrl = null;
+
+  function desenharVars() {
+    const defs = (escolhido?.variaveis ?? []).map((d) => (estadoVars[d.nome] !== undefined ? { ...d, padrao: estadoVars[d.nome] } : d));
+    varsCtrl = defs.length ? formularioVariaveis(defs) : null;
+    preencher(varsArea, varsCtrl ? [h('p', { class: 'sutil pequeno mt-2', text: 'Variáveis do script (chegam como FAROL_<NOME>):' }), varsCtrl.el] : null);
+  }
+  async function escolher() {
+    const s = await abrirEscolherScript();
+    if (!s) return;
+    escolhido = s;
+    desenharScript();
+  }
+  function desenharScript() {
+    preencher(areaScript, escolhido
+      ? h('div', { class: 'linha-entre' },
+        h('div', {}, h('span', { class: 'forte pequeno', text: escolhido.nome }), h('div', { class: 'sutil pequeno', text: escolhido.origem === 'script' ? 'Meus scripts' : 'Biblioteca' })),
+        podeEditar ? botao('Trocar', { tamanho: 'pequeno', onclick: escolher }) : null)
+      : h('div', { class: 'linha-entre' }, h('span', { class: 'sutil pequeno', text: 'Nenhum script escolhido' }),
+        podeEditar ? botao('Escolher script…', { tamanho: 'pequeno', icone: 'scripts', onclick: escolher }) : null));
+    desenharVars();
+  }
+  (async () => {
+    if (atual.script_id) { try { escolhido = { ...(await get(`/api/scripts/${atual.script_id}`)), origem: 'script' }; } catch { /* script apagado */ } }
+    else if (atual.biblioteca_id) { try { const b = await get(`/api/biblioteca/${atual.biblioteca_id}`); escolhido = { ...b, origem: 'biblioteca', timeout: b.tempo_limite }; } catch { /* saiu da biblioteca */ } }
+    desenharScript();
+  })();
+
+  return {
+    tipo,
+    el: h('fieldset', { class: 'cartao', estilo: { padding: '16px' } },
+      h('legend', { class: 'sr', text: nome }),
+      h('div', { class: 'linha-entre' }, h('strong', { text: nome }), sw.el),
+      areaScript, varsArea,
+      h('label', { class: 'linha pequeno muted mt-3' }, 'Não repetir em menos de', limite, 'min', h('span', { class: 'sutil', text: '(evita picotar se o alerta ficar entrando e saindo)' }))),
+    coletar: () => ({
+      ativo: sw.input.checked,
+      script_id: escolhido?.origem === 'script' ? escolhido.id : null,
+      biblioteca_id: escolhido?.origem === 'biblioteca' ? escolhido.id : null,
+      variaveis: varsCtrl ? varsCtrl.valores() : {},
+      timeout: escolhido?.timeout ?? null,
+      limiteMinutos: Number(limite.value) || 0,
+    }),
+  };
+}
+
+function secaoRespostas(el) {
+  el.append(skeleton(6));
+  get('/api/alertas/respostas').then((cfg) => {
+    const podeEditar = pode('alertas.respostas');
+    const blocos = Object.keys(TIPOS).map((tipo) => blocoResposta(tipo, nomeTipo(tipo), cfg[tipo], podeEditar));
+    const salvar = botao('Salvar respostas automáticas', { variante: 'primario', icone: 'check', tipo: 'submit', desabilitado: !podeEditar });
+    const form = h('form', {
+      class: 'pilha', onsubmit: (ev) => {
+        ev.preventDefault();
+        comCarregando(salvar, async () => {
+          const corpo = Object.fromEntries(blocos.map((b) => [b.tipo, b.coletar()]));
+          const r = await comElevacao('Salvar respostas automáticas a alerta.', () => put('/api/alertas/respostas', corpo));
+          if (!r) return;
+          toast('Respostas automáticas salvas.', 'sucesso');
+        });
+      },
+    },
+    podeEditar ? null : aviso('Somente administradores configuram respostas automáticas.', 'info'),
+    aviso('Roda uma vez por ABERTURA do alerta (não a cada atualização dele, enquanto continua aberto). Fica auditado e aparece em Execuções, criado por "sistema (resposta a alerta)".', 'info'),
+    h('div', { class: 'grade-2' }, blocos.map((b) => b.el)),
+    h('div', { class: 'linha' }, salvar));
+    preencher(el, form);
+  }).catch(toastErro);
+}
+
 function secaoRegras(el) {
   el.append(skeleton(6));
   get('/api/config').then((cfg) => {
@@ -366,6 +478,7 @@ export default {
     farol.widget({ id: 'alertas', titulo: 'Alertas por severidade', ordem: 20, tamanho: 4, permissao: 'alertas.ver', render: widgetSeveridade });
     farol.secaoConfig({ id: 'alertas', rotulo: 'Regras de alerta', descricao: 'Limites de CPU, memória, disco e offline, e o webhook.', icone: 'alertas', ordem: 40, permissao: 'alertas.ver', render: secaoRegras });
     farol.secaoConfig({ id: 'alertas-manutencao', rotulo: 'Janelas de manutenção', descricao: 'Suspenda alertas e webhook temporariamente em dispositivos, sites ou clientes.', icone: 'relogio', ordem: 41, permissao: 'alertas.ver', render: secaoManutencao });
+    farol.secaoConfig({ id: 'alertas-respostas', rotulo: 'Respostas automáticas', descricao: 'Rodar um script sozinho quando um alerta de CPU, memória, disco ou offline abrir.', icone: 'raio', ordem: 42, permissao: 'alertas.ver', render: secaoRespostas });
     farol.notificacoes({
       id: 'alertas', permissao: 'alertas.ver', eventos: ['alerta'], href: '#/alertas',
       contar: async () => (await atualizarContador())?.abertos ?? 0,
