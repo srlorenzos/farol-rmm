@@ -84,6 +84,25 @@ export default {
     return {
       /** Ver criarExecucao() acima — é isto que agendamentos/alertas (resposta automática) devem chamar. */
       executar: (opcoes) => criarExecucao(ctx, opcoes),
+      /**
+       * Resolve script_id (script do usuário) ou biblioteca_id num objeto de script pronto para `executar()`.
+       * Mesma resolução usada por POST /api/executar — reaproveitada por agendamentos e pela resposta
+       * automática de alertas, para nunca duplicar como um script_id/biblioteca_id vira um script executável.
+       * @returns {{ script }|{ erro }}
+       */
+      resolverScript({ script_id, biblioteca_id }) {
+        if (script_id) {
+          const s = ctx.servicos.scripts.obter(script_id);
+          if (!s) return { erro: 'Script não encontrado' };
+          return { script: { ...s, origem: `script:${s.id}` } };
+        }
+        if (biblioteca_id) {
+          const item = ctx.servicos.biblioteca.obter(biblioteca_id);
+          if (!item) return { erro: 'Script não encontrado na biblioteca' };
+          return { script: { ...item, timeout: item.tempo_limite, origem: `biblioteca:${item.id}` } };
+        }
+        return { erro: 'Informe script_id ou biblioteca_id' };
+      },
     };
   },
   migracoes: [
@@ -172,14 +191,10 @@ export default {
     }, async (req, reply) => {
       const b = req.body;
       let script;
-      if (b.script_id) {
-        script = ctx.servicos.scripts.obter(b.script_id);
-        if (!script) return reply.code(404).send({ erro: 'Script não encontrado' });
-        script = { ...script, origem: `script:${script.id}` };
-      } else if (b.biblioteca_id) {
-        const item = ctx.servicos.biblioteca.obter(b.biblioteca_id);
-        if (!item) return reply.code(404).send({ erro: 'Script não encontrado na biblioteca' });
-        script = { ...item, timeout: item.tempo_limite, origem: `biblioteca:${item.id}` };
+      if (b.script_id || b.biblioteca_id) {
+        const { script: s, erro } = ctx.servicos.jobs.resolverScript({ script_id: b.script_id, biblioteca_id: b.biblioteca_id });
+        if (erro) return reply.code(404).send({ erro });
+        script = s;
       } else if (b.comando && b.shell) {
         script = { nome: `Comando: ${b.comando.split('\n')[0].slice(0, 60)}`, shell: b.shell, conteudo: b.comando, timeout: 60,
           so: null, tipo: 'acao', variaveis: [], origem: 'comando' };

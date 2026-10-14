@@ -22,6 +22,52 @@ export function regrasAtuais(db) {
   return r;
 }
 
+// ---------- respostas automáticas (rodar um script sozinho quando um alerta abre) ----------
+const RESPOSTA_PADRAO = { ativo: false, script_id: null, biblioteca_id: null, variaveis: {}, timeout: null, limiteMinutos: 0 };
+
+/** Config atual de resposta automática por tipo (cpu/ram/disco/offline), sempre com os 4 presentes. */
+export function respostasAtuais(db) {
+  const salvas = lerConfig(db, 'respostas', {});
+  const r = {};
+  for (const k of Object.keys(REGRAS_PADRAO)) r[k] = { ...RESPOSTA_PADRAO, ...(salvas[k] || {}) };
+  return r;
+}
+
+/**
+ * Dispara (sem bloquear quem chamou `abrir()`) o script de resposta automática configurado para o tipo do
+ * alerta, se houver um ativo e o disparo não estiver dentro da janela de limite (flapping: um alerta que
+ * fecha e reabre repetidamente não deve executar a resposta a cada vez). Nunca roda durante manutenção —
+ * mesma regra do webhook. Sempre auditado (sucesso ou falha), nunca lança: é fogo-e-esquece de propósito,
+ * do jeito que enviarWebhook() já é.
+ */
+function dispararRespostaAutomatica(ctx, alerta) {
+  const resp = respostasAtuais(ctx.db)[alerta.tipo];
+  if (!resp?.ativo || (!resp.script_id && !resp.biblioteca_id)) return;
+  const agora = Date.now();
+  const limiteMs = (resp.limiteMinutos ?? 0) * 60_000;
+  if (limiteMs > 0) {
+    const ultimo = ctx.db.prepare('SELECT disparado_em FROM alertas_respostas_log WHERE tipo = ? AND agente_id = ?').get(alerta.tipo, alerta.agente_id);
+    if (ultimo && agora - ultimo.disparado_em < limiteMs) return;
+  }
+  ctx.db.prepare(`INSERT INTO alertas_respostas_log (tipo, agente_id, disparado_em) VALUES (?, ?, ?)
+    ON CONFLICT(tipo, agente_id) DO UPDATE SET disparado_em = excluded.disparado_em`).run(alerta.tipo, alerta.agente_id, agora);
+  (async () => {
+    try {
+      const { script, erro } = ctx.servicos.jobs.resolverScript({ script_id: resp.script_id, biblioteca_id: resp.biblioteca_id });
+      if (erro) throw new Error(erro);
+      const r = await ctx.servicos.jobs.executar({
+        script, variaveisExtra: resp.variaveis ?? {}, timeoutOverride: resp.timeout ?? undefined,
+        alvo: { tipo: 'agente', id: alerta.agente_id }, criadoPor: 'sistema (resposta a alerta)',
+      });
+      ctx.auditar({ acao: 'alerta_resposta_disparada', alvo: alerta.hostname ?? alerta.agente_id, agente_id: alerta.agente_id,
+        detalhes: { tipo: alerta.tipo, alerta_id: alerta.id, script: script.nome, lote: r.lote, jobs: r.jobs.length, automatico: true } });
+    } catch (e) {
+      ctx.auditar({ acao: 'alerta_resposta_falhou', alvo: alerta.hostname ?? alerta.agente_id, agente_id: alerta.agente_id,
+        detalhes: { tipo: alerta.tipo, alerta_id: alerta.id, erro: String(e?.message ?? e).slice(0, 500), automatico: true } });
+    }
+  })();
+}
+
 /** Overrides de um agente para um tipo (objeto parcial {ativo?, limite?, ciclos?, minutos?}), ou null. */
 function overrideDoAgente(db, agenteId, tipo) {
   const row = db.prepare('SELECT ajustes_json FROM alertas_overrides WHERE agente_id = ? AND tipo = ?').get(agenteId, tipo);
@@ -109,7 +155,10 @@ function criarServico(ctx) {
       const hostname = agente.hostname ?? db.prepare('SELECT hostname FROM agentes WHERE id = ?').get(agente.id)?.hostname;
       const alerta = { id: Number(lastInsertRowid), agente_id: agente.id, hostname, tipo, mensagem, valor, severidade, status: 'aberto', aberto_em: agora, suprimido: suprimir };
       ctx.emitir('alerta', alerta);
-      if (!suprimir) enviarWebhook(ctx, alerta);
+      if (!suprimir) {
+        enviarWebhook(ctx, alerta);
+        dispararRespostaAutomatica(ctx, alerta);
+      }
       return alerta;
     },
 
@@ -159,12 +208,13 @@ export function avaliarMetricas(ctx, agente, { cpu, ramPct, discoMax, discoPonto
 
 export default {
   nome: 'alertas',
-  descricao: 'Regras de alerta, severidade e webhook',
-  depende: ['agentes'],
+  descricao: 'Regras de alerta, severidade, webhook e respostas automáticas',
+  depende: ['agentes', 'jobs'],
   permissoes: {
     'alertas.ver': { descricao: 'Ver alertas', papeis: ['tecnico', 'leitura'] },
     'alertas.resolver': { descricao: 'Marcar alertas como resolvidos', papeis: ['tecnico'] },
     'alertas.configurar': { descricao: 'Alterar regras de alerta e webhook' },
+    'alertas.respostas': { descricao: 'Configurar scripts de resposta automática a alertas (exige 2FA)' },
   },
   migracoes: [
     // 1 — tabela da v1
@@ -208,6 +258,13 @@ export default {
       criado_por TEXT,
       atualizado_em INTEGER NOT NULL,
       PRIMARY KEY (agente_id, tipo)
+    );`,
+    // 4 — controle de limite (flapping) das respostas automáticas: último disparo por tipo+agente
+    `CREATE TABLE alertas_respostas_log (
+      tipo TEXT NOT NULL,
+      agente_id TEXT NOT NULL,
+      disparado_em INTEGER NOT NULL,
+      PRIMARY KEY (tipo, agente_id)
     );`,
   ],
 
@@ -366,6 +423,43 @@ export default {
       const ok = await enviarWebhook(ctx, { tipo: 'teste', hostname: 'Farol', mensagem: 'Webhook de teste — está funcionando.' }, url);
       ctx.auditarReq(req, 'webhook_testado', { detalhes: ok ? 'ok' : 'falhou' });
       return ok ? { ok } : reply.code(502).send({ erro: 'O webhook não respondeu com sucesso' });
+    });
+
+    // ---------- Respostas automáticas (rodar um script sozinho quando um alerta abre) ----------
+    const respostaSchema = {
+      type: 'object', additionalProperties: false, required: ['ativo'],
+      properties: {
+        ativo: { type: 'boolean' },
+        script_id: { type: ['integer', 'null'], minimum: 1 },
+        biblioteca_id: { type: ['string', 'null'], pattern: '^[a-z0-9][a-z0-9-]{0,79}$' },
+        variaveis: { type: 'object', maxProperties: 30, additionalProperties: { type: ['string', 'number', 'boolean', 'null'] } },
+        timeout: { type: ['integer', 'null'], minimum: 5, maximum: 86_400 },
+        limiteMinutos: { type: 'integer', minimum: 0, maximum: 10_080 },
+      },
+    };
+
+    app.get('/api/alertas/respostas', { preHandler: ctx.exigir('alertas.ver') }, async () => respostasAtuais(db));
+
+    app.put('/api/alertas/respostas', {
+      preHandler: ctx.exigir('alertas.respostas', { elevado: true }),
+      schema: { body: {
+        type: 'object', additionalProperties: false, required: ['cpu', 'ram', 'disco', 'offline'],
+        properties: { cpu: respostaSchema, ram: respostaSchema, disco: respostaSchema, offline: respostaSchema },
+      } },
+    }, async (req, reply) => {
+      const b = req.body;
+      for (const tipo of Object.keys(REGRAS_PADRAO)) {
+        const r = b[tipo];
+        if (!r.ativo) continue;
+        if (!r.script_id && !r.biblioteca_id) return reply.code(400).send({ erro: `${NOMES[tipo]}: escolha um script para rodar` });
+        if (r.script_id && r.biblioteca_id) return reply.code(400).send({ erro: `${NOMES[tipo]}: informe só um, script ou biblioteca` });
+        const { erro } = ctx.servicos.jobs.resolverScript({ script_id: r.script_id, biblioteca_id: r.biblioteca_id });
+        if (erro) return reply.code(404).send({ erro: `${NOMES[tipo]}: ${erro}` });
+      }
+      const antes = respostasAtuais(db);
+      definirConfig(db, 'respostas', b);
+      ctx.auditarReq(req, 'alerta_respostas_alteradas', { alvo: 'alertas', detalhes: { antes, depois: b } });
+      return respostasAtuais(db);
     });
 
     // ---------- Janelas de manutenção ----------

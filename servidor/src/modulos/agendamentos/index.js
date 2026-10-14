@@ -26,15 +26,9 @@ function linhaPublica(a) {
   };
 }
 
-async function obterScript(ctx, { script_id, biblioteca_id }) {
-  if (script_id) {
-    const s = ctx.servicos.scripts.obter(script_id);
-    if (!s) return { erro: 'Script não encontrado' };
-    return { script: { ...s, origem: `script:${s.id}` } };
-  }
-  const item = ctx.servicos.biblioteca.obter(biblioteca_id);
-  if (!item) return { erro: 'Script não encontrado na biblioteca' };
-  return { script: { ...item, timeout: item.tempo_limite, origem: `biblioteca:${item.id}` } };
+/** Atalho: mesma resolução de jobs.resolverScript(), só que já aceitando o formato {script_id, biblioteca_id} usado aqui. */
+function obterScript(ctx, { script_id, biblioteca_id }) {
+  return ctx.servicos.jobs.resolverScript({ script_id, biblioteca_id });
 }
 
 /** Dispara um agendamento: cria os jobs (reaproveitando jobs.executar), grava o disparo e a auditoria,
