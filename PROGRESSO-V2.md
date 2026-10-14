@@ -7,14 +7,69 @@ Objetivo: RMM completo no nível do Datto RMM (funções + visual premium), iden
 - [x] Biblioteca: 551 scripts (393 Windows, 141 Linux, 21 macOS; 88 monitores) em 31 categorias, validador com 0 erros, sintaxe ok (PS/bash/py), 97 scripts Windows executados de verdade sem erro. Linux/macOS só checados por sintaxe. `.ps1` em UTF-8 com BOM (o carregador precisa tolerar). Gerador fora do repo: scratchpad `gen.mjs` + `b/*.txt`.
 
 ## Etapa 2 (depois da etapa 1, em paralelo, cada um num módulo)
-- [ ] Sites/grupos/filtros, descoberta de rede
-- [x] Instaladores Windows (empacotamento/): `farol-agente.exe` (PyInstaller; build em pasta para o serviço pywin32 "Farol RMM Agent", build de arquivo único com Tarefa Agendada como plano B), `FarolAgenteSetup.exe` (Inno Setup, `/VERYSILENT /SERVIDOR= /TOKEN=`), `farol-servidor.exe` (Node SEA, node:sqlite ok, assets embutidos), ícone multi-resolução, versão única em `empacotamento/VERSION`, `build.ps1`, workflow `release.yml` (tag `v*`, assinatura opcional) e comando silencioso na API de tokens/painel. Testado: exes contra servidor temporário (registro, check-in, `modulos`, `status`), SEA servindo painel/biblioteca/.pyz. NÃO testado por falta de administrador: criar serviço de verdade, UAC, rodar o Setup. `farol-bandeja.exe`: spec pronto, depende de `agente/farol_bandeja.py` (outro agente); rebuildar quando existir.
-- [ ] Ferramentas remotas: processos, serviços, arquivos, registro, eventos, terminal, tela remota
-- [ ] Automação: jobs agendados, políticas de monitoramento, auto-resposta
+- [ ] Sites/grupos/filtros dinâmicos, descoberta de rede
+- [x] Instaladores Windows (empacotamento/): `farol-agente.exe` (PyInstaller; build em pasta para o serviço pywin32 "Farol RMM Agent", build de arquivo único com Tarefa Agendada como plano B), `FarolAgenteSetup.exe` (Inno Setup, `/VERYSILENT /SERVIDOR= /TOKEN=`), `farol-servidor.exe` (Node SEA, node:sqlite ok, assets embutidos), ícone multi-resolução, versão única em `empacotamento/VERSION`, `build.ps1`, workflow `release.yml` (tag `v*`, assinatura opcional) e comando silencioso na API de tokens/painel. Testado: exes contra servidor temporário (registro, check-in, `modulos`, `status`), SEA servindo painel/biblioteca/.pyz. NÃO testado por falta de administrador: criar serviço de verdade, UAC, rodar o Setup. `farol-bandeja.exe`: spec pronto, build pendente (o código-fonte já está pronto, ver item de 14/10 abaixo).
+- [ ] Ferramentas remotas: processos, serviços, arquivos, registro, eventos, **tela remota**. **Terminal interativo**:
+  o relay (sessão contínua painel⇄agente) já existe no núcleo e está testado (módulo `terminal`, exemplo `ping`/eco)
+  — falta só a tela no painel; hoje só existe o console de comando único (Execuções → comando rápido).
+- [ ] Automação: jobs agendados recorrentes, políticas de monitoramento, auto-resposta
 - [ ] Patches (Windows Update, apt/dnf), software (winget), relatórios, dashboards
-- [ ] Usuários/RBAC, notificações (e-mail/Teams/Discord), demo atualizada na vitrine
+- [x] Usuários/RBAC: módulo `usuarios` — convite por link (sem senha provisória), redefinição de senha por link do
+  admin, papéis fixos (admin/técnico/leitura) já existentes desde a etapa 1. Testado (convite, duplicata,
+  redefinição, token inválido/expirado).
+- [ ] Notificações por e-mail/Teams/Discord nativas (hoje só webhook genérico — Discord/Slack/ntfy via isso). Demo
+  atualizada na vitrine.
 - [x] Licenças e site de vendas: módulo `licenca` no servidor (chave Ed25519 `FAROL-<payload>.<assinatura>` verificada offline; grátis até 5 dispositivos; carência de 7 dias; aviso 15 dias antes; recusa de registro com HTTP 402 via serviço `licenca.verificarRegistro()` chamado pelo módulo agentes; Configurações → Licença e aviso na visão geral), `servidor/scripts/emitir-licenca.js`, 62 testes do servidor passando. Site em `site/` (HTML/CSS/JS puro + funções Vercel: checkout Stripe, webhook, licença por sessão, contato; Blob privado), publicado em https://farol-rmm.vercel.app (projeto Vercel `farol-rmm`, time coube-studio; deploy sempre de cópia fora do repo, ver README). Pendente do dono: variáveis `STRIPE_*`, `LICENCA_CHAVE_PRIVADA`, `BLOB_READ_WRITE_TOKEN` e o webhook do Stripe. Chave privada e licença do dono em `..arol-segredos\` (fora do repo).
+
+## Etapa 2 — passagem de qualidade (2026-10-14)
+Sessão única terminando o que ficou pela metade de agentes anteriores + fechando os gaps críticos. Tudo testado de
+ponta a ponta contra servidor/agente/bandeja **temporários** (nunca o servidor real :8420 nem o agente real deste PC).
+- [x] **2FA com QR Code real**: gerador de QR em JS puro (`painel/js/modulos/configuracoes/qr-encode.js` + `qr-svg.js`,
+  ISO/IEC 18004 completo — Reed-Solomon, máscaras, informação de formato/versão), renderizado como SVG preto sobre
+  branco. A URI `otpauth://` nunca sai do navegador. Testado com `jsqr` (leitor real) decodificando de volta em
+  vários tamanhos de chave/usuário, e confirmado visualmente (QR nítido, 2FA ativado de ponta a ponta).
+- [x] **Janelas de manutenção + exceções de alerta por agente**: já estava quase pronto no servidor
+  (`alertas/index.js`); terminei e testei (10 testes: supressão, expiração, cancelamento, overrides). Construí a
+  parte do painel que faltava inteira: cartão "Manutenção" e "Exceções de alerta" na aba Alertas do dispositivo,
+  seção "Janelas de manutenção" em Configurações, badge "Manut." na lista de dispositivos. Testado ao vivo: janela
+  curta, CPU forçada acima do limite, supressão confirmada (0 no resumo, 0 webhook), cancelamento destrava na hora.
+- [x] **Detecção de shell incompatível**: agente reporta no check-in quais interpretadores existem de verdade
+  (`interpretador:cmd|powershell|bash|sh|python3`, via `shutil.which`), falha rápido com mensagem acionável (como
+  instalar o que falta) em vez do erro genérico do `subprocess`. Painel avisa na gaveta "Executar script" quando
+  algum dispositivo selecionado não tem o interpretador do script. 8 testes novos no agente.
+- [x] **Retenção de métricas em camadas (downsampling)** — maior item novo, não tinha nada pronto: granularidade
+  fina (1 ponto/min) só por 48 h; três tarefas periódicas agregam em 15 min (14 dias)/1 h (90 dias)/1 dia (365 dias),
+  cada balde com min/max/média/p95 calculados sempre a partir do dado cru. Poda nunca apaga dado que uma camada
+  ainda não processou. A rota de histórico escolhe a granularidade certa pelo período pedido. 7 testes novos + teste
+  de carga real (50 agentes × 7 dias × 1 ponto/min = 504 mil linhas): inserção 3,4 s, agregação do backlog inteiro
+  6,8 s, poda reduz o cru de 504 mil pra 144 mil linhas em 2 s, banco cai de 83,5 MB pra 29 MB após VACUUM manual.
+  Consulta de 30 dias já agregada: 3,7 ms. Gráfico de 30/90 dias confirmado no painel.
+- [x] **Bandeja do Windows**: revisei e terminei ~2200 linhas que já existiam (ícone pystray com status
+  verde/cinza/laranja, janela pywebview com fallback no navegador, abas Sistema/Chamados/Novo chamado, API local
+  127.0.0.1:8421 com token/Host/Origin). Achei e corrigi um bug real: a API local não mandava cabeçalhos CORS nem
+  respondia `OPTIONS` — o caminho sem pywebview (navegador padrão, que o próprio código já previa como alternativa)
+  falhava com "Failed to fetch" em qualquer chamada autenticada. Também liguei os recursos configuráveis
+  (chamados/print/ações-rápidas) que o painel já ia expor mas a bandeja ainda ignorava, e corrigi um `.btn[hidden]`
+  que não escondia (CSS `display:flex` vencendo o `display:none` do atributo `hidden` — mesmo bug que
+  `.painel[hidden]` já tratava). 85 testes do agente (78 + 7 de CORS). Testado com agente real + bandeja real contra
+  servidor temporário: abriu chamado pela API local, confirmou que chegou no painel.
+- [x] **Interface de chamados no painel** — gap crítico: o backend (`servidor/src/modulos/chamados`) estava
+  commitado há tempo sem nenhuma tela. Módulo novo `painel/js/modulos/chamados/`: lista com filtros e ação em
+  massa, tela de conversa em linha do tempo com prints ampliáveis, aba no dispositivo, widget na Visão Geral, seção
+  "Bandeja do agente" em Configurações. Acrescentei o filtro `?agente=` que faltava em `GET /api/chamados` pra aba
+  do dispositivo funcionar. Testado de ponta a ponta: responder pelo painel fecha o ciclo aberto pela bandeja.
+- [x] **Passagem de qualidade visual completa**: todas as telas (Visão Geral, Dispositivos, as 8 abas do detalhe,
+  Biblioteca, Scripts, Execuções, Alertas, Auditoria, todas as seções de Configurações, #/estilo) em 1440px e 500px,
+  claro e escuro, Edge headless com log de console. Zero erro de console em qualquer combinação. Achei e corrigi 3
+  problemas reais: ações de auditoria dos módulos novos apareciam como `snake_case` cru (faltavam no `ROTULOS` de
+  `painel/js/modulos/auditoria/index.js`); "Windows Windows 11 Pro" duplicado no painel lateral do chamado; coluna
+  Status meio apertada na lista de chamados. Confirmei que o CSS responsivo (`.dividido`, tabela virtual) e os
+  tokens de tema claro/escuro funcionam sem ajuste nenhum pros módulos novos, por terem reaproveitado só
+  componentes existentes (nenhum CSS novo em `painel/css/` — proibido pelas regras de módulo).
+- [x] Testes completos: 87 testes do servidor (`npm test`), 85 do agente (1 skip esperado no Windows), validador da
+  biblioteca com 0 erros (551 scripts). README.md e este arquivo atualizados.
 
 ## Para retomar
 Ler este arquivo, ARQUITETURA.md e `git log`. Itens não marcados: relançar o agente correspondente.
 Não publicar: push e deploy só depois de revisar. Netlify está em ~75% dos créditos do mês — evitar deploys; considerar mover a vitrine para GitHub Pages.
+Próximo item óbvio: tela de terminal interativo no painel (o relay de backend já está pronto e testado).

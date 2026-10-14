@@ -6,20 +6,23 @@ Inspirado em ferramentas RMM como Tactical RMM e NinjaOne; código 100% original
 
 ## O que ele faz
 
-- **Inventário e métricas em tempo real.** Cada agente faz check-in a cada 15 s com CPU, RAM, discos, uptime, usuário logado e IP. A cada hora envia o inventário completo: sistema, fabricante/modelo, processador, interfaces de rede com MAC e a lista de softwares instalados (registro do Windows; `dpkg`/`rpm` no Linux).
-- **Painel web.** Visão geral com totais e máquinas mais carregadas, lista de agentes com busca e filtros, detalhe com gráficos de CPU e RAM (1 h, 24 h, 7 dias), discos, inventário em abas, histórico de execuções e console de comando rápido. Tema escuro (padrão) e claro, responsivo até 375 px, atualização ao vivo por WebSocket.
-- **Scripts remotos.** Biblioteca de scripts PowerShell, CMD, Bash e Python, com exemplos prontos (limpar temporários, serviços parados, espaço em disco, reiniciar spooler, informações de rede, processos que mais usam CPU). Execute em um ou vários agentes de uma vez; o agente roda com tempo limite, encerra a árvore de processos se estourar e devolve stdout, stderr e código de saída (até 64 KB cada).
-- **Alertas.** Regras globais para CPU e RAM acima de X% por N check-ins, disco acima de X% e agente offline há mais de N minutos. Os alertas abrem e se resolvem sozinhos, aparecem com contador na barra lateral e podem disparar um webhook (Discord, Slack, ntfy).
-- **Auditoria.** Logins (e falhas), tokens criados, agentes registrados/revogados, scripts executados, comandos digitados e mudanças de regras, com usuário, data, alvo e IP. Página com filtros.
-- **Segurança de verdade.** Senhas com scrypt, 2FA TOTP obrigatório para executar qualquer coisa, reconfirmação por código a cada 10 min, bloqueio progressivo de login, CSRF, CSP restrita, tokens de uso único. Detalhes em [Segurança](#segurança).
+- **Inventário e métricas em tempo real.** Cada agente faz check-in a cada 15 s com CPU, RAM, discos, uptime, usuário logado e IP. A cada hora envia o inventário completo: sistema, fabricante/modelo, processador, interfaces de rede com MAC e a lista de softwares instalados (registro do Windows; `dpkg`/`rpm` no Linux). O histórico fica em camadas: 1 ponto/min por 48 h, depois agregado automaticamente (médias de 15 min por 14 dias, horárias por 90 dias, diárias por 1 ano, cada balde com min/max/média/p95) — o gráfico escolhe a granularidade certa pelo período pedido (1 h a 90 dias).
+- **Painel web.** Visão geral com totais, alertas e chamados abertos, lista de agentes com busca e filtros, detalhe com gráficos de CPU e RAM, discos, inventário em abas, histórico de execuções e console de comando rápido. Tema escuro (padrão) e claro, responsivo até 375 px, atualização ao vivo por WebSocket.
+- **Scripts remotos.** Biblioteca de 551 scripts PowerShell, CMD, Bash e Python prontos, em 31 categorias. Execute em um ou vários agentes de uma vez; o agente roda com tempo limite, encerra a árvore de processos se estourar e devolve stdout, stderr e código de saída (até 64 KB cada).
+- **Alertas.** Regras globais para CPU e RAM acima de X% por N check-ins, disco acima de X% e agente offline há mais de N minutos, com exceções por dispositivo (limite próprio ou tipo desligado) e janelas de manutenção (suprimem webhook/contagem num dispositivo, site ou cliente por um período, sem esconder o alerta — fica auditável). Os alertas abrem e se resolvem sozinhos, aparecem com contador na barra lateral e podem disparar um webhook (Discord, Slack, ntfy).
+- **Bandeja do agente e chamados de suporte.** Ícone opcional na área de notificação do Windows (`farol-bandeja.exe`) com status de conexão, dados do computador e um helpdesk simples: o usuário final abre um chamado (com print de tela anexado), o técnico responde pelo painel, o usuário acompanha na mesma bandeja. Marca, contato e recursos configuráveis em Configurações.
+- **Multi-usuário.** Convide técnicos e leitores por link (sem senha provisória), três papéis fixos (administrador, técnico, somente leitura), redefinição de senha por link gerado pelo admin.
+- **Auditoria.** Logins (e falhas), tokens criados, agentes registrados/revogados, scripts executados, comandos digitados, mudanças de regras/exceções/janelas de manutenção e de chamados, com usuário, data, alvo e IP. Página com filtros.
+- **Segurança de verdade.** Senhas com scrypt, 2FA TOTP obrigatório para executar qualquer coisa (com QR Code gerado localmente, sem round-trip a nenhum serviço externo), reconfirmação por código a cada 10 min, bloqueio progressivo de login, CSRF, CSP restrita, tokens de uso único. Detalhes em [Segurança](#segurança).
 
 ## Como é o painel
 
 - **Login**: cartão centralizado; na primeira execução vira o formulário de criação do administrador.
-- **Visão geral**: quatro cartões (agentes, online, offline, alertas abertos) com uma faixa de cor à esquerda, a lista das máquinas com maior uso (mini barras de CPU/RAM/disco com o valor em texto) e as últimas execuções com selo de status.
+- **Visão geral**: cartões de dispositivos, alertas e chamados abertos com uma faixa de cor à esquerda, a lista das máquinas com maior uso (mini barras de CPU/RAM/disco com o valor em texto) e as últimas execuções com selo de status.
 - **Agentes**: tabela com caixa de busca, filtros de status e sistema, ponto verde pulsante para quem está online (sempre acompanhado do texto "Online"/"Offline"), mini barras e ações rápidas que aparecem ao passar o mouse. Marcar várias linhas abre uma barra de ações em lote para executar um script em todas.
-- **Detalhe do agente**: cabeçalho com sistema, IP, usuário, uptime e último contato; abas Desempenho (gráficos de linha em SVG feitos à mão, com linha-guia vertical e tooltip ao passar o mouse ou usar as setas do teclado, e tabela de dados alternativa), Inventário (Hardware, Rede, Softwares com busca), Execuções (saída expansível em bloco monoespaçado) e Console.
+- **Detalhe do agente**: cabeçalho com sistema, IP, usuário, uptime e último contato; abas Resumo, Monitoramento (gráficos de linha em SVG feitos à mão, 1 h a 90 dias, com linha-guia vertical e tooltip ao passar o mouse ou usar as setas do teclado, e tabela de dados alternativa), Inventário (Hardware, Rede, Softwares com busca), Execuções (console de comando rápido + histórico), Alertas (exceções e janela de manutenção do dispositivo), Chamados e Auditoria.
 - **Scripts**: lista à esquerda e editor à direita com numeração de linhas. "Executar…" abre a seleção de agentes e depois a confirmação do código 2FA.
+- **Chamados**: lista com filtros e ação em massa de status; tela de um chamado com conversa em linha do tempo, prints ampliáveis, dados do dispositivo e troca de status/prioridade/responsável.
 
 ## Arquitetura
 
@@ -144,6 +147,26 @@ A configuração fica em `%ProgramData%\Farol\config.json` (Windows), `/etc/faro
 
 O servidor também entrega o agente em `/download/farol_agente.py`, que é o que os comandos gerados pelo painel usam.
 
+## Como usar
+
+### Bandeja do agente e chamados
+
+No Windows, o instalador (`FarolAgenteSetup.exe`) já registra a bandeja (`farol-bandeja.exe`) para abrir com o usuário. Rodando do código: `python agente/farol_bandeja.py` (precisa de `pystray`, `Pillow`, `mss` e, no Windows, `pywebview` — veja `agente/requirements.txt`). Ela fala só com a API local do próprio agente (127.0.0.1:8421, token em `%ProgramData%\Farol\bandeja.token`), nunca direto com o servidor. O ícone mostra um ponto de status (verde conectado, cinza desconectado, laranja resposta não lida) e um menu com Abrir, Novo chamado, Meus chamados, Copiar dados do sistema e Sair. A janela tem abas Sistema (hardware, desempenho, ações rápidas), Chamados e Novo chamado (com print de tela anexável).
+
+No painel, **Chamados** no menu lateral mostra a lista com contador de abertos; abra um chamado para ver a conversa, mudar status/prioridade/responsável e responder — a resposta chega na bandeja do usuário (pelo canal em tempo real, ou no próximo check-in). O detalhe do dispositivo tem uma aba **Chamados** só com os daquele computador. Em **Configurações → Bandeja do agente**, defina o nome da empresa, a cor, um ícone opcional, o contato do suporte e ligue/desligue os recursos (chamados, print, ações rápidas) por instalação.
+
+### Usuários e papéis
+
+Em **Configurações → Usuários e papéis** (só administrador), convide alguém por `usuario` + `papel` (`tecnico` ou `leitura`) — o convite gera um link de uso único (válido por tempo limitado) para a pessoa definir a própria senha, sem senha provisória passando por e-mail ou chat. Para redefinir a senha de alguém que esqueceu, gere outro link do mesmo jeito; o anterior é invalidado. Um administrador sempre pode tudo; técnico executa scripts e comandos (com 2FA) mas não configura o sistema; leitura só visualiza.
+
+### Console / comando rápido
+
+A aba **Execuções** do detalhe do dispositivo tem uma caixa de comando rápido (PowerShell, CMD, Bash ou Python) com `Ctrl+Enter` para executar — pede confirmação 2FA como qualquer execução e fica na auditoria. Um terminal interativo de verdade (sessão contínua, não comando-a-comando) já tem o relay pronto no servidor e no agente, mas ainda não tem tela no painel — o botão "Terminal" no cabeçalho do dispositivo aparece como "em breve".
+
+### Janelas de manutenção e exceções de alerta
+
+Pela aba **Alertas** do dispositivo, "Colocar em manutenção" suspende alertas (webhook e contagem) só naquele computador por um tempo definido — o alerta continua sendo gerado e fica auditável, só não dispara nem conta como aberto. Em **Configurações → Janelas de manutenção** fica a lista geral, com a opção de criar uma para um cliente, site ou todos os dispositivos de uma vez. Na mesma aba Alertas, "Exceções de alerta" deixa definir um limite diferente (ou desligar um tipo de alerta) só para aquele dispositivo, sem mexer na regra global em Configurações → Regras de alerta.
+
 ## Produção
 
 ### HTTPS é obrigatório
@@ -233,11 +256,11 @@ Status de um job: `pendente` → `enviado` → `sucesso` / `falha` / `timeout`. 
 ## Testes
 
 ```bash
-cd servidor && npm test                                   # 33 testes, node --test
-python -m unittest discover -s agente/testes -v           # 17 testes
+cd servidor && npm test                                   # 87 testes, node --test
+python -m unittest discover -s agente/testes -v           # 85 testes
 ```
 
-O servidor é testado com `fastify.inject` e banco em memória: hash de senha, vetores TOTP do RFC 6238 (SHA-1/256/512), login com 2FA, bloqueio progressivo, CSRF, CSP, rate limit, token de instalação (uso único, expirado, inválido), check-in autenticado e negado, ciclo completo de job, truncamento, regras de alerta abrindo e resolvendo, webhook e auditoria. O agente é testado na coleta de métricas e inventário, execução com timeout matando a árvore de processos, truncamento, montagem do payload e recusa de `http://` não local. O GitHub Actions roda os dois conjuntos a cada push.
+O servidor é testado com `fastify.inject` e banco em memória: hash de senha, vetores TOTP do RFC 6238 (SHA-1/256/512), login com 2FA, bloqueio progressivo, CSRF, CSP, rate limit, token de instalação (uso único, expirado, inválido), check-in autenticado e negado, ciclo completo de job, truncamento, regras de alerta abrindo e resolvendo (com exceções por agente e janelas de manutenção), webhook, auditoria, QR Code do 2FA decodificado por um leitor real, downsampling de métricas (agregação em camadas, poda que nunca perde dado não processado, rota escolhendo a granularidade certa), chamados (fluxo completo, isolamento entre agentes, anexos) e convites/redefinição de usuários. O agente é testado na coleta de métricas e inventário, execução com timeout matando a árvore de processos, truncamento, montagem do payload, recusa de `http://` não local, detecção de interpretadores disponíveis e a API local da bandeja (token, Host/Origin, CORS, rotas). O GitHub Actions roda os dois conjuntos a cada push.
 
 ## Licenças e site
 
@@ -263,22 +286,22 @@ Testes locais: `cd site && npm install && npm run teste` (runner com `req`/`res`
 
 ## Roadmap
 
-- Acesso remoto (terminal interativo e área de trabalho via WebRTC)
-- Patches: listar e aplicar atualizações do Windows Update / `apt`
-- Checks agendados (scripts recorrentes com alerta por código de saída) e tarefas agendadas
-- Multi-tenant: clientes e sites, com agentes agrupados
-- RBAC: papéis (somente leitura, técnico, administrador) e vários usuários
+- Terminal interativo no painel (relay já pronto no servidor/agente) e área de trabalho remota
+- Patches: listar e aplicar atualizações do Windows Update / `apt`/`dnf`
+- Jobs agendados recorrentes e políticas de automação/auto-resposta
+- Sites/grupos dinâmicos e descoberta automática de rede
+- Notificações por e-mail e Teams/Discord nativas (hoje só webhook genérico)
 - Assinatura dos scripts e atualização automática do agente
 
 ## Limitações
 
-- Um único administrador por enquanto (o banco já suporta vários usuários, falta a interface e os papéis).
-- Sem acesso remoto interativo: o console é "envia comando, recebe saída".
-- No Windows o agente tem instalador .exe sem Python; no Linux/macOS ainda é um script Python (3.10+ e `psutil`). Comandos PowerShell no Linux só funcionam se o `pwsh` estiver instalado. Os exes não são assinados enquanto não houver certificado.
+- Sem acesso remoto interativo de verdade: o "Terminal" no cabeçalho do dispositivo está "em breve" — o relay já existe no servidor e no agente (mesmo mecanismo usado pelo terminal de comando único e pelos chamados), falta só a tela no painel. O que existe hoje é o console de comando único (Execuções → comando rápido): manda, espera, recebe a saída — não é uma sessão contínua.
+- No Windows o agente tem instalador .exe sem Python; no Linux/macOS ainda é um script Python (3.10+ e `psutil`). Comandos PowerShell no Linux só funcionam se o `pwsh` estiver instalado — o agente detecta os interpretadores disponíveis e avisa antes de mandar um script incompatível, com uma mensagem explicando como instalar o que falta. Os exes não são assinados enquanto não houver certificado.
 - Jobs ficam na fila até o próximo check-in (até ~15 s de latência).
-- Regras de alerta são globais; não há exceções por máquina nem janelas de manutenção.
-- Histórico de métricas guarda 1 ponto por minuto por 7 dias; SQLite atende bem algumas centenas de agentes, não milhares.
-- QR code do 2FA não é gerado; use a chave ou a URI `otpauth://`.
+- SQLite atende bem algumas centenas de agentes, não milhares. O histórico de métricas é guardado em camadas (1 ponto/min por 48 h, depois agregado em 15 min/1 h/1 dia com retenção de 14/90/365 dias) justamente para isso — ver `ARQUITETURA.md`.
+- Sites/grupos e descoberta automática de rede ainda não existem (só clientes/sites manuais).
+- Sem patches do Windows Update / `apt`/`dnf`, sem políticas de automação/jobs agendados recorrentes, sem notificação por e-mail (webhook cobre Discord/Slack/ntfy).
+- Convite de usuário e redefinição de senha são só por link gerado no painel (sem envio de e-mail automático — o administrador copia e manda o link).
 
 ## Licença
 
